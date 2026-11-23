@@ -1,11 +1,13 @@
 import { Input } from './input.js';
 import { initAudio, sfx } from './audio.js';
 import { World, VW, VH } from './world.js';
-import { renderWorld, text } from './render.js';
+import { renderWorld, renderBackdrop, text, light, drawVignette, FONT } from './render.js';
+import { drawErrante } from './sprites.js';
 import { setupTouch, tryFullscreenLandscape } from './touch.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+if (document.fonts && document.fonts.load) document.fonts.load(`8px ${'Silkscreen'}`).catch(() => {});
 ctx.imageSmoothingEnabled = false;
 
 function fit() {
@@ -93,30 +95,38 @@ function update(dt) {
   }
 }
 
+const TITLE_HERO = { facing: 1, action: null, t: 0, flash: 0, invuln: 0, dead: false, onGround: true, vx: 0, vy: 0, walkPhase: 0, perfectFlash: 0, comboIndex: 0 };
 function drawTitle() {
   const t = game.time;
-  ctx.fillStyle = '#121115'; ctx.fillRect(0, 0, VW, VH);
-  for (let i = 0; i < 90; i++) {
-    const x = (i * 97.3 + t * 12) % VW, y = (i * 53.7 + t * (14 + (i % 5) * 4)) % VH;
-    ctx.globalAlpha = 0.2 + (i % 4) * 0.1; ctx.fillStyle = '#8a827b'; ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+  renderBackdrop(ctx, t * 10, t, { ashUp: false });
+  // penhasco em primeiro plano
+  ctx.fillStyle = '#0c0b0e';
+  for (let x = 0; x < VW; x++) {
+    const h = 26 + Math.round(Math.sin(x * 0.03) * 4 + Math.sin(x * 0.11) * 2) + (x > 250 && x < 330 ? 10 : 0);
+    ctx.fillRect(x, VH - h, 1, h);
   }
-  ctx.globalAlpha = 1;
-  // Runa
+  const hx = 292, hy = VH - 36;
+  ctx.globalCompositeOperation = 'lighter';
+  light(ctx, hx, hy - 12, 30, '#a72f2f', 0.35 + Math.sin(t * 2) * 0.1);
+  ctx.globalCompositeOperation = 'source-over';
+  drawErrante(ctx, TITLE_HERO, hx, hy, t);
+  drawVignette(ctx);
+  // moldura de carta de tarô em volta do título
+  const cx = VW / 2 - 40;
+  ctx.fillStyle = '#6d4b32';
+  ctx.fillRect(cx - 120, 34, 240, 1); ctx.fillRect(cx - 120, 98, 240, 1);
+  ctx.fillRect(cx - 120, 34, 1, 64); ctx.fillRect(cx + 119, 34, 1, 64);
+  ctx.fillStyle = '#d4b66f';
+  [[cx - 121, 33], [cx + 118, 33], [cx - 121, 97], [cx + 118, 97]].forEach(([x, y]) => ctx.fillRect(x, y, 3, 3));
+  text(ctx, '0  ·  O LOUCO  ·  0', cx, 48, '#8b633f', 'center', 8);
+  text(ctx, 'THE LAST ARCANA', cx, 72, '#e8d2a8', 'center', 16);
+  text(ctx, 'VALE DAS CINZAS', cx, 89, '#b66a3b', 'center', 8);
   const g = 0.6 + Math.sin(t * 2) * 0.4;
-  ctx.globalAlpha = g; ctx.fillStyle = '#a72f2f';
-  ctx.fillRect(VW / 2 - 2, 40, 4, 16); ctx.fillRect(VW / 2 - 8, 46, 16, 3);
+  ctx.globalAlpha = g; ctx.fillStyle = '#c0303a';
+  ctx.fillRect(cx, 18, 1, 9); ctx.fillRect(cx - 3, 21, 7, 1);
   ctx.globalAlpha = 1;
-  text(ctx, 'THE LAST ARCANA', VW / 2, 86, '#e8e0d0', 'center', 22);
-  text(ctx, 'Região 1 — Vale das Cinzas', VW / 2, 104, '#b66a3b', 'center', 9);
-  const list = Input.touchMode ? TOUCH_CONTROLS : CONTROLS;
-  list.forEach(([k, d], i) => {
-    const col = i < 6 ? 0 : 1;
-    const x = col === 0 ? 48 : 262, y = 132 + (i % 6) * 12;
-    text(ctx, k, x, y, '#d9b58a', 'left', 8);
-    text(ctx, d, x + (col === 0 ? 62 : 30), y, '#a59d95', 'left', 8);
-  });
-  if (Math.sin(t * 4) > -0.3) text(ctx, Input.touchMode ? 'Toque na tela para despertar' : 'Clique ou pressione ENTER para despertar', VW / 2, 222, '#e8e0d0', 'center', 9);
-  text(ctx, 'Controle compatível · demonstração — protótipo jogável', VW / 2, 252, '#5a544f', 'center', 7);
+  if (Math.sin(t * 4) > -0.3) text(ctx, Input.touchMode ? 'TOQUE PARA DESPERTAR' : 'ENTER PARA DESPERTAR', cx, 132, '#e8e0d0', 'center', 8);
+  text(ctx, Input.touchMode ? 'gire o celular · botões na tela' : 'esc  ·  controles durante o jogo', cx, 146, '#7a726c', 'center', 8);
 }
 
 let lastRender = performance.now();
@@ -128,16 +138,17 @@ function render() {
   renderWorld(ctx, game.world, game.time, dt);
   if (game.state === 'pause') {
     ctx.globalAlpha = 0.75; ctx.fillStyle = '#0c0b0d'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1;
-    text(ctx, 'PAUSA', VW / 2, 50, '#e8e0d0', 'center', 14);
-    (Input.touchMode ? TOUCH_CONTROLS : CONTROLS).forEach(([k, d], i) => { text(ctx, k, 120, 76 + i * 13, '#d9b58a'); text(ctx, d, 200, 76 + i * 13, '#a59d95'); });
-    text(ctx, Input.touchMode ? 'Toque em PULAR para voltar' : 'Esc para voltar', VW / 2, 250, '#8a827b', 'center');
+    text(ctx, 'PAUSA', VW / 2, 28, '#e8d2a8', 'center', 16);
+    (Input.touchMode ? TOUCH_CONTROLS : CONTROLS).forEach(([k, d], i) => { text(ctx, k, 70, 50 + i * 12, '#d9b58a'); text(ctx, d, 160, 50 + i * 12, '#a59d95'); });
+    text(ctx, Input.touchMode ? 'toque em pular para voltar' : 'esc para voltar', VW / 2, 206, '#7a726c', 'center');
   }
   if (game.state === 'dead') {
     const a = Math.min(1, game.deathT / 1.2);
     ctx.globalAlpha = a * 0.7; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = a;
-    text(ctx, 'VOCÊ SE DESFEZ EM CINZAS', VW / 2, VH / 2 - 6, '#a72f2f', 'center', 16);
-    text(ctx, `A cinza te devolve em: ${game.world.checkpoint.name}`, VW / 2, VH / 2 + 12, '#a59d95', 'center');
-    if (game.deathT > 1.2) text(ctx, Input.touchMode ? 'Toque em PULAR para continuar' : 'ENTER para continuar', VW / 2, VH / 2 + 30, '#e8e0d0', 'center');
+    text(ctx, 'VOCÊ SE DESFEZ', VW / 2, VH / 2 - 14, '#c0303a', 'center', 16);
+    text(ctx, 'EM CINZAS', VW / 2, VH / 2 + 2, '#c0303a', 'center', 16);
+    text(ctx, `a cinza te devolve em: ${game.world.checkpoint.name}`, VW / 2, VH / 2 + 20, '#a59d95', 'center');
+    if (game.deathT > 1.2) text(ctx, Input.touchMode ? 'toque em pular para continuar' : 'enter para continuar', VW / 2, VH / 2 + 36, '#e8e0d0', 'center');
     ctx.globalAlpha = 1;
   }
 }

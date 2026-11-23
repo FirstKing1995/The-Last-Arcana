@@ -4,7 +4,7 @@ import { Input } from './input.js';
 const CSS = `
 #touch { position: fixed; inset: 0; pointer-events: none; z-index: 5; display: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none;
-  font-family: monospace; }
+  font-family: Silkscreen, monospace; }
 #touch.on { display: block; }
 #touch .zone { position: absolute; left: 0; bottom: 0; width: 42%; height: 78%; pointer-events: auto; touch-action: none; }
 #touch .stick { position: absolute; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%;
@@ -15,7 +15,7 @@ const CSS = `
   color: rgba(217,181,138,.35); font-size: 11px; }
 #touch .b { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1;
-  color: #f0e6d6; font-size: 11px; font-weight: bold; letter-spacing: .02em;
+  color: #f0e6d6; font-size: 10px; letter-spacing: .02em;
   background: rgba(30,27,32,.55); border: 2px solid rgba(217,181,138,.45); }
 #touch .b.big { width: 66px; height: 66px; font-size: 12px; }
 #touch .b.mid { width: 54px; height: 54px; }

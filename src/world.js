@@ -7,7 +7,7 @@ import { FX } from './fx.js';
 import { sfx } from './audio.js';
 import { ARCANA, RELICS, PLAYER } from './data.js';
 
-export const VW = 480, VH = 270;
+export const VW = 384, VH = 216;
 
 const ELION_LINES = [
   ['Elion', 'Você acordou no meio da cinza... e ela não te queimou.'],

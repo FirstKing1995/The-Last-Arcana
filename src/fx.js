@@ -45,7 +45,7 @@ export class FX {
       ctx.fillRect(Math.round(p.x - cam.x), Math.round(p.y - cam.y), p.size, p.size);
     }
     ctx.globalAlpha = 1;
-    ctx.font = '8px monospace';
+    ctx.font = '8px Silkscreen, monospace';
     ctx.textAlign = 'center';
     for (const n of this.nums) {
       ctx.globalAlpha = Math.min(1, n.life * 2);
