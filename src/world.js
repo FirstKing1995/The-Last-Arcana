@@ -7,6 +7,10 @@ import { FX } from './fx.js';
 import { sfx } from './audio.js';
 import { ARCANA, RELICS, PLAYER, MOBS, WEAPONS, HERBS, BOSS } from './data.js';
 import { saveProgress, grantWeapon, masteryLevel } from './state.js';
+import { Input } from './input.js';
+
+// Nome do comando conforme teclado ou toque
+function k(key, touch) { return Input.touchMode ? touch : key; }
 
 export const VW = 384, VH = 216;
 
@@ -87,6 +91,33 @@ export class World {
   }
   alertNear(mob) {
     for (const m of this.mobs) if (m !== mob && !m.dead && !m.aggro && Math.abs(m.cx() - mob.cx()) < 90 && Math.abs(m.cy() - mob.cy()) < 50) m.aggro = true;
+  }
+
+  // Dicas de contexto: aparecem uma única vez
+  tip(id, text, dur = 5) {
+    const tips = this.flags.tips || (this.flags.tips = {});
+    if (tips[id]) return;
+    tips[id] = true;
+    this.toast(text, dur);
+  }
+
+  updateTips() {
+    const p = this.player;
+    if (p.dead) return;
+    if (this.inCombat) this.tip('aviso', `Aviso amarelo: apare (${k('L', 'APARAR')}). Vermelho: esquive (${k('Shift', 'ESQUIVA')}).`, 6);
+    if (p.vigor < 20) this.tip('vigor', 'Vigor baixo: pare de atacar um instante para recuperar.');
+    if (p.hp < p.maxHp * 0.5) this.tip('cura', `Beba um frasco (${k('Q', 'CURA')}). A cura leva 2,5 s e dano forte a interrompe.`);
+    if (this.finisherTarget()) this.tip('final', `Postura quebrada! Chegue perto e aperte ${k('E', 'E')} para finalizar.`);
+    const tx = p.cx() / TILE, ty = (p.y + p.h) / TILE;
+    if (tx > 126 && tx < 134 && ty < 17) this.tip('cripta', `Uma descida sob o campanário (${k('S + Espaço', '↓ + PULAR')} desce pela tábua).`);
+    if (tx > 101 && tx < 130 && ty > 26) this.tip('sinos', 'Sinos sem badalo são falsos: tocam se você passar por baixo. Quebre-os ou passe esquivando.', 6);
+    if (tx > 71 && tx < 100 && ty > 26) this.tip('vento', 'Cinza soprada em ciclos: avance na calmaria e abrigue-se atrás dos pilares.', 6);
+    if (this.flags.bossDefeated && this.prog.arcana[0] === 'louco') this.tip('arcano', `O Louco: ${k('F', 'ARC')} usa Salto de Cinzas. Veja a maestria no inventário (${k('I', 'INV')}).`, 6);
+    // Marco de aproximação: o sino do campanário ecoa ao longe
+    if (!this.flags.bossDefeated && tx > 148 && tx < 167 && ty < 17) {
+      this.bellT = (this.bellT || 0) - 1 / 60;
+      if (this.bellT <= 0) { this.bellT = 5; sfx.bell(98, 0.05); }
+    }
   }
 
   toast(text, dur = 2.2) {
@@ -454,6 +485,8 @@ export class World {
         const cyc = it.t % 4;
         it.phase = cyc < 1.1 ? 'warn' : cyc < 2.4 ? 'gust' : 'calm';
         const inRoom = p.cx() > 71 * TILE && p.cx() < 100 * TILE && p.y > 25 * TILE && p.y < 32 * TILE;
+        const near = p.y > 20 * TILE && Math.abs(p.cx() - it.x) < 520;
+        if (!near) continue;
         if (it.phase === 'warn' && Math.random() < 0.5) this.fx.parts.push({ x: it.x + Math.random() * 10, y: 26 * TILE + Math.random() * 90, vx: 60 + Math.random() * 40, vy: 0, life: 0.6, max: 0.6, color: '#7a726c', grav: 0, size: 1 });
         if (it.phase === 'gust') {
           for (let i = 0; i < 3; i++) this.fx.parts.push({ x: it.x + Math.random() * 20, y: 26 * TILE + Math.random() * 96, vx: 260 + Math.random() * 120, vy: (Math.random() - 0.5) * 20, life: 1.4, max: 1.4, color: Math.random() < 0.3 ? '#b66a3b' : '#9a918a', grav: 0, size: 2 });
@@ -534,6 +567,7 @@ export class World {
     this.updateFauna(dt);
     this.updateLoot(dt);
     if (this.echo) { this.echo.t -= dt; if (this.echo.t <= 0) this.echo = null; }
+    this.updateTips();
 
     const a = this.level.arena;
     const bossReady = !this.boss.dead && (!this.flags.bossDefeated || this.boss.isEcho);

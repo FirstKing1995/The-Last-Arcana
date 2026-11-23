@@ -86,58 +86,79 @@ function deadTree(ctx, x, base, h, color, id) {
   }
 }
 
+// Camadas de fundo pré-renderizadas (uma vez) em faixas largas: cada quadro é só um drawImage por camada.
+const LAYER_BASE = 200;
+let layers = null;
+function ridgeStrip(c, width, base, amp, freq, seed, color, step = 2) {
+  c.fillStyle = color;
+  for (let x = 0; x < width; x += step) {
+    const wx = x * freq;
+    const h = noise1(wx + seed) * amp + noise1(wx * 2.7 + seed * 3) * amp * 0.35 + (hash(Math.floor(wx * 6) + seed) > 0.93 ? 4 : 0);
+    const y = Math.round(base - h);
+    c.fillRect(x, y, step, 300 - y);
+  }
+}
+function haze(c, width, y0, y1, rgb, a) {
+  const g = c.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(1, `rgba(${rgb},${a})`);
+  c.fillStyle = g; c.fillRect(0, y0, width, 300 - y0);
+}
+function makeLayer(width, build) {
+  const cv = document.createElement('canvas');
+  cv.width = width; cv.height = 300;
+  build(cv.getContext('2d'), width);
+  return cv;
+}
+function buildLayers(worldW) {
+  const W0 = Math.ceil(worldW * 0.05 + VW + 64), W1 = Math.ceil(worldW * 0.16 + VW + 128), W2 = Math.ceil(worldW * 0.42 + VW + 160);
+  return {
+    far: makeLayer(W0, (c, w) => {
+      ridgeStrip(c, w, LAYER_BASE, 46, 0.012, 1, '#2a2226');
+      haze(c, w, LAYER_BASE - 30, LAYER_BASE + 25, '98,91,88', 0.16);
+    }),
+    towers: makeLayer(W1, (c, w) => {
+      for (let id = 0; id * 80 < w; id++) {
+        const x = Math.round(id * 80 + hash(id) * 30);
+        tower(c, x, LAYER_BASE, 40 + Math.floor(hash(id + 5) * 46), 10 + Math.floor(hash(id + 2) * 4) * 2, '#1c181c', '#4f3326', id);
+      }
+      ridgeStrip(c, w, LAYER_BASE + 2, 10, 0.03, 7, '#1c181c');
+      haze(c, w, LAYER_BASE - 30, LAYER_BASE + 10, '60,40,34', 0.35);
+    }),
+    mid: makeLayer(W2, (c, w) => {
+      for (let k = 0; k * 96 < w; k++) {
+        const id = k + 100;
+        const x = Math.round(k * 96 + hash(id) * 40);
+        const kind = Math.floor(hash(id + 7) * 3);
+        const y3 = LAYER_BASE;
+        if (kind === 0) deadTree(c, x, y3, 34 + Math.floor(hash(id + 1) * 20), '#141115', id);
+        else if (kind === 1) {
+          c.fillStyle = '#141115';
+          c.fillRect(x, y3 - 44, 7, 44); c.fillRect(x + 26, y3 - 30, 7, 30);
+          for (let q = 0; q < 14; q++) c.fillRect(x + 3 + q, y3 - 44 - Math.round(Math.sin(q / 13 * Math.PI) * 8), 2, 4);
+          c.fillStyle = '#3a2620'; c.fillRect(x + 6, y3 - 44, 1, 44);
+        } else {
+          c.fillStyle = '#141115';
+          for (let q = 0; q < 40; q++) c.fillRect(x + Math.floor(q / 14), y3 - q, 2, 1);
+          c.fillRect(x + 2, y3 - 40, 10, 2);
+          c.fillStyle = '#2a1d18'; c.fillRect(x + 8, y3 - 38, 5, 5);
+        }
+      }
+      ridgeStrip(c, w, LAYER_BASE, 6, 0.05, 13, '#141115');
+      haze(c, w, LAYER_BASE - 24, LAYER_BASE + 30, '90,52,36', 0.28);
+    }),
+  };
+}
+
 function backdrop(ctx, cam, time, world) {
   sky(ctx);
   // clarões distantes iluminam os campanários antes de trovões abafados
   const ft = time % 11;
   const flash = ft < 0.35 ? (1 - ft / 0.35) : 0;
   if (flash > 0) { ctx.globalAlpha = 0.18 * flash; ctx.fillStyle = '#e8c9a0'; ctx.fillRect(0, 0, VW, VH * 0.75); ctx.globalAlpha = 1; }
-
-  const yOff = -cam.y * 0.08;
-  ridge(ctx, cam.x * 0.05, 150 + yOff, 46, 0.012, 1, '#2a2226');
-  // névoa alta
-  let g = ctx.createLinearGradient(0, 120 + yOff, 0, 175 + yOff);
-  g.addColorStop(0, 'rgba(98,91,88,0)'); g.addColorStop(1, 'rgba(98,91,88,0.16)');
-  ctx.fillStyle = g; ctx.fillRect(0, 100 + yOff, VW, 90);
-
-  // campanários distantes
-  const off2 = cam.x * 0.16, y2 = Math.round(176 - cam.y * 0.14);
-  const win = flash > 0.2 ? '#c79a6a' : '#4f3326';
-  for (let i = -1; i < 7; i++) {
-    const id = Math.floor(off2 / 80) + i;
-    const x = Math.round(i * 80 - (off2 % 80) + hash(id) * 30);
-    tower(ctx, x, y2, 40 + Math.floor(hash(id + 5) * 46), 10 + Math.floor(hash(id + 2) * 4) * 2, '#1c181c', win, id);
-  }
-  ridge(ctx, cam.x * 0.16, y2 + 2, 10, 0.03, 7, '#1c181c');
-
-  g = ctx.createLinearGradient(0, y2 - 30, 0, y2 + 10);
-  g.addColorStop(0, 'rgba(60,40,34,0)'); g.addColorStop(1, 'rgba(60,40,34,0.35)');
-  ctx.fillStyle = g; ctx.fillRect(0, y2 - 30, VW, 60);
-
-  // camada média: árvores carbonizadas, postes tortos e arcos partidos
-  const off3 = cam.x * 0.42, y3 = Math.round(198 - cam.y * 0.4);
-  for (let i = -1; i < 6; i++) {
-    const id = Math.floor(off3 / 96) + i + 100;
-    const x = Math.round(i * 96 - (off3 % 96) + hash(id) * 40);
-    const kind = Math.floor(hash(id + 7) * 3);
-    if (kind === 0) deadTree(ctx, x, y3, 34 + Math.floor(hash(id + 1) * 20), '#141115', id);
-    else if (kind === 1) {
-      ctx.fillStyle = '#141115';
-      ctx.fillRect(x, y3 - 44, 7, 44); ctx.fillRect(x + 26, y3 - 30, 7, 30);
-      for (let k = 0; k < 14; k++) ctx.fillRect(x + 3 + k, y3 - 44 - Math.round(Math.sin(k / 13 * Math.PI) * 8), 2, 4);
-      ctx.fillStyle = '#3a2620'; ctx.fillRect(x + 6, y3 - 44, 1, 44);
-    } else {
-      ctx.fillStyle = '#141115';
-      for (let k = 0; k < 40; k++) ctx.fillRect(x + Math.floor(k / 14), y3 - k, 2, 1);
-      ctx.fillRect(x + 2, y3 - 40, 10, 2);
-      ctx.fillStyle = '#2a1d18'; ctx.fillRect(x + 8, y3 - 38, 5, 5);
-    }
-  }
-  ridge(ctx, cam.x * 0.42, y3, 6, 0.05, 13, '#141115');
-  // névoa baixa quente
-  g = ctx.createLinearGradient(0, y3 - 24, 0, y3 + 30);
-  g.addColorStop(0, 'rgba(90,52,36,0)'); g.addColorStop(1, 'rgba(90,52,36,0.28)');
-  ctx.fillStyle = g; ctx.fillRect(0, y3 - 24, VW, 80);
+  if (!layers) layers = buildLayers((world.level ? world.level.g[0].length : 240) * TILE);
+  ctx.drawImage(layers.far, -Math.round(cam.x * 0.05), Math.round(150 - cam.y * 0.08) - LAYER_BASE);
+  ctx.drawImage(layers.towers, -Math.round(cam.x * 0.16), Math.round(176 - cam.y * 0.14) - LAYER_BASE);
+  ctx.drawImage(layers.mid, -Math.round(cam.x * 0.42), Math.round(198 - cam.y * 0.4) - LAYER_BASE);
 }
 
 // Cinza oblíqua (ou subindo após libertar O Louco)
