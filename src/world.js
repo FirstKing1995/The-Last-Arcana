@@ -4,7 +4,7 @@ import { Player } from './player.js';
 import { MOB_CLASSES } from './enemies.js';
 import { Asgmor } from './boss.js';
 import { FX } from './fx.js';
-import { sfx } from './audio.js';
+import { sfx, setMusicMode } from './audio.js';
 import { ARCANA, RELICS, PLAYER, MOBS, WEAPONS, HERBS, BOSS } from './data.js';
 import { saveProgress, grantWeapon, masteryLevel } from './state.js';
 import { Input } from './input.js';
@@ -141,6 +141,7 @@ export class World {
 
   addCoins(n, x, y) {
     this.prog.coins += n;
+    if (n > 0) sfx.coins();
     if (x !== undefined) {
       this.fx.number(x, y, '+' + n, '#e8c96a');
       this.fx.burst(x, y, Math.min(12, 3 + Math.floor(n / 10)), '#d4b66f', 50, 0.5, 120, 1);
@@ -578,6 +579,7 @@ export class World {
       this.banner = { text: this.boss.isEcho ? 'ECO DE ASGMOR' : 'ASGMOR', sub: 'O Louco corrompido', t: 0, dur: 2.6 };
     }
 
+    setMusicMode(this.arenaLocked ? 'boss' : p.y > 24 * TILE ? 'crypt' : 'explore');
     this.inCombat = this.bossFight || this.targets().some((m) => m.aggro && Math.abs(m.cx() - p.cx()) < 300);
     if (this.ashUp && Math.random() < 0.3 && p.y < 22 * TILE) {
       this.fx.parts.push({ x: this.cam.x + Math.random() * VW, y: this.cam.y + VH + 4, vx: (Math.random() - 0.5) * 10, vy: -20 - Math.random() * 20, life: 6, max: 6, color: Math.random() < 0.3 ? '#d9b58a' : '#9a918a', grav: 0, size: 1 });

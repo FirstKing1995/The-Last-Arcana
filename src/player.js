@@ -158,7 +158,11 @@ export class Player {
     const vyBefore = this.vy;
     moveBody(this, w.level, dt);
     if (this.justLanded && vyBefore > 300) { sfx.land(); w.fx.burst(this.cx(), this.y + this.h, 5, '#625b58', 30, 0.3, 50); }
-    if (this.onGround && Math.abs(this.vx) > 10) this.walkPhase += dt * Math.abs(this.vx) * 0.12;
+    if (this.onGround && Math.abs(this.vx) > 10) {
+      const before = Math.floor(this.walkPhase / Math.PI);
+      this.walkPhase += dt * Math.abs(this.vx) * 0.12;
+      if (!this.action && Math.floor(this.walkPhase / Math.PI) !== before) sfx.step();
+    }
 
     if (this.y > w.level.g.length * TILE + 40) { this.hp = 0; this.takeHit(1, null, {}); }
   }

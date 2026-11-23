@@ -47,7 +47,7 @@ export class Mob {
     this.postureCd = 2;
     this.flash = 0.1;
     this.aggro = true;
-    if (result !== 'guarded') { sfx.hit(); w.fx.burst(this.cx(), this.cy(), 6, this.bloodColor || '#e17a3d', 60, 0.35); }
+    if (result !== 'guarded') { if (info.kind === 'heavy' || info.kind === 'finisher') sfx.hitHeavy(); else sfx.hit(); w.fx.burst(this.cx(), this.cy(), 6, this.bloodColor || '#e17a3d', 60, 0.35); }
     w.fx.number(this.cx(), this.y - 3, dmg, result === 'guarded' ? '#9aa0aa' : '#f2e6d0');
     if (this.hp <= 0) { this.die(); return 'kill'; }
     if (this.posture >= this.def.posture && this.state !== 'broken') {
