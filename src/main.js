@@ -2,18 +2,23 @@ import { Input } from './input.js';
 import { initAudio, sfx } from './audio.js';
 import { World, VW, VH } from './world.js';
 import { renderWorld, text } from './render.js';
+import { setupTouch, tryFullscreenLandscape } from './touch.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 function fit() {
-  const s = Math.max(1, Math.floor(Math.min(window.innerWidth / VW, window.innerHeight / VH)));
+  // Escala inteira quando cabe (pixels nítidos); no celular, ocupa a tela toda.
+  let s = Math.min(window.innerWidth / VW, window.innerHeight / VH);
+  if (s >= 2) s = Math.floor(s);
   canvas.style.width = VW * s + 'px';
   canvas.style.height = VH * s + 'px';
 }
 window.addEventListener('resize', fit);
+window.addEventListener('orientationchange', () => setTimeout(fit, 200));
 fit();
+setupTouch(fit);
 
 const CONTROLS = [
   ['A / D', 'mover'], ['W / Espaço', 'pular (S+Espaço desce)'], ['Shift', 'esquiva (segure: correr)'],
@@ -22,15 +27,22 @@ const CONTROLS = [
   ['Tab', 'trocar Arcano'], ['E', 'interagir / finalizar'], ['Esc', 'pausa'],
 ];
 
+const TOUCH_CONTROLS = [
+  ['Esquerda', 'arraste para mover'], ['↓ + PULAR', 'desce da plataforma'], ['ESQUIVA', 'segure p/ correr'],
+  ['ATACAR', 'combo de 3 golpes'], ['PESADO', 'segure para carregar'], ['APARAR', 'no aviso amarelo'],
+  ['CURA', 'frasco'], ['FOGO', 'feitiço'], ['ARC', 'habilidade Arcano'],
+  ['⇄', 'trocar Arcano'], ['E', 'falar / finalizar'], ['❚❚', 'pausa'],
+];
+
 const game = { state: 'title', world: null, time: 0, deathT: 0, titleT: 0 };
 window.__game = game; // usado pelos testes automatizados
 
 Input.onAny = () => initAudio();
 let clickedStart = false;
-canvas.addEventListener('pointerdown', () => {
+window.addEventListener('pointerdown', () => {
   canvas.focus();
-  if (game.state === 'title') clickedStart = true;
-});
+  if (game.state === 'title') { clickedStart = true; if (Input.touchMode) tryFullscreenLandscape(); }
+}, true);
 
 function newGame() {
   game.world = new World();
@@ -96,13 +108,14 @@ function drawTitle() {
   ctx.globalAlpha = 1;
   text(ctx, 'THE LAST ARCANA', VW / 2, 86, '#e8e0d0', 'center', 22);
   text(ctx, 'Região 1 — Vale das Cinzas', VW / 2, 104, '#b66a3b', 'center', 9);
-  CONTROLS.forEach(([k, d], i) => {
+  const list = Input.touchMode ? TOUCH_CONTROLS : CONTROLS;
+  list.forEach(([k, d], i) => {
     const col = i < 6 ? 0 : 1;
     const x = col === 0 ? 48 : 262, y = 132 + (i % 6) * 12;
     text(ctx, k, x, y, '#d9b58a', 'left', 8);
     text(ctx, d, x + (col === 0 ? 62 : 30), y, '#a59d95', 'left', 8);
   });
-  if (Math.sin(t * 4) > -0.3) text(ctx, 'Clique ou pressione ENTER para despertar', VW / 2, 222, '#e8e0d0', 'center', 9);
+  if (Math.sin(t * 4) > -0.3) text(ctx, Input.touchMode ? 'Toque na tela para despertar' : 'Clique ou pressione ENTER para despertar', VW / 2, 222, '#e8e0d0', 'center', 9);
   text(ctx, 'Controle compatível · demonstração — protótipo jogável', VW / 2, 252, '#5a544f', 'center', 7);
 }
 
@@ -116,15 +129,15 @@ function render() {
   if (game.state === 'pause') {
     ctx.globalAlpha = 0.75; ctx.fillStyle = '#0c0b0d'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1;
     text(ctx, 'PAUSA', VW / 2, 50, '#e8e0d0', 'center', 14);
-    CONTROLS.forEach(([k, d], i) => { text(ctx, k, 120, 76 + i * 13, '#d9b58a'); text(ctx, d, 200, 76 + i * 13, '#a59d95'); });
-    text(ctx, 'Esc para voltar', VW / 2, 250, '#8a827b', 'center');
+    (Input.touchMode ? TOUCH_CONTROLS : CONTROLS).forEach(([k, d], i) => { text(ctx, k, 120, 76 + i * 13, '#d9b58a'); text(ctx, d, 200, 76 + i * 13, '#a59d95'); });
+    text(ctx, Input.touchMode ? 'Toque em PULAR para voltar' : 'Esc para voltar', VW / 2, 250, '#8a827b', 'center');
   }
   if (game.state === 'dead') {
     const a = Math.min(1, game.deathT / 1.2);
     ctx.globalAlpha = a * 0.7; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = a;
     text(ctx, 'VOCÊ SE DESFEZ EM CINZAS', VW / 2, VH / 2 - 6, '#a72f2f', 'center', 16);
     text(ctx, `A cinza te devolve em: ${game.world.checkpoint.name}`, VW / 2, VH / 2 + 12, '#a59d95', 'center');
-    if (game.deathT > 1.2) text(ctx, 'ENTER para continuar', VW / 2, VH / 2 + 30, '#e8e0d0', 'center');
+    if (game.deathT > 1.2) text(ctx, Input.touchMode ? 'Toque em PULAR para continuar' : 'ENTER para continuar', VW / 2, VH / 2 + 30, '#e8e0d0', 'center');
     ctx.globalAlpha = 1;
   }
 }

@@ -26,6 +26,7 @@ const PAD = {
 
 const codeDown = new Set();
 const padDown = new Set();
+const virtDown = new Set(); // controles de toque
 const pressTime = {};
 const now = () => performance.now() / 1000;
 
@@ -44,15 +45,22 @@ window.addEventListener('keydown', (e) => {
   Input.onAny && Input.onAny();
 });
 window.addEventListener('keyup', (e) => { codeDown.delete(e.code); });
-window.addEventListener('blur', () => { codeDown.clear(); padDown.clear(); });
+window.addEventListener('blur', () => { codeDown.clear(); padDown.clear(); virtDown.clear(); });
 window.addEventListener('pointerdown', () => { Input.onAny && Input.onAny(); });
 
 export const Input = {
   onAny: null,
   down(a) {
     if (BIND[a] && BIND[a].some((c) => codeDown.has(c))) return true;
-    return padDown.has(a);
+    return padDown.has(a) || virtDown.has(a);
   },
+  touchMode: false,
+  virtualPress(actions) {
+    for (const a of actions) { if (!virtDown.has(a)) pressTime[a] = now(); virtDown.add(a); }
+    Input.onAny && Input.onAny();
+  },
+  virtualRelease(actions) { for (const a of actions) virtDown.delete(a); },
+  virtualHold(a, on) { if (on) virtDown.add(a); else virtDown.delete(a); },
   pressed(a, buffer = 0.14) {
     const t = pressTime[a];
     return t !== undefined && now() - t <= buffer;

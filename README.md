@@ -45,3 +45,7 @@ Controle de Xbox/PS também funciona: A pula, B esquiva, X ataque leve, Y pesado
 - Arte e som são gerados por código, usando as paletas HEX do Atlas. Não há nenhum arquivo externo.
 
 Veja [`docs/DESIGN.md`](docs/DESIGN.md) para a relação entre o manual e o que já foi implementado, e para o que vem depois.
+
+### Celular
+
+Jogue com a tela deitada; com o celular em pé, aparece um aviso pra girar. Arraste o lado esquerdo da tela pra mover. Os botões ficam à direita: PULAR, ATACAR, PESADO, ESQUIVA, APARAR, E, CURA e FOGO. No topo ficam ARC (habilidade do Arcano), ⇄ (trocar Arcano) e pausa. No Android o jogo entra em tela cheia ao tocar no título.
