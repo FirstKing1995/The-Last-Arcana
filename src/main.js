@@ -26,6 +26,11 @@ const game = { state: 'title', world: null, time: 0, deathT: 0, titleT: 0 };
 window.__game = game; // usado pelos testes automatizados
 
 Input.onAny = () => initAudio();
+let clickedStart = false;
+canvas.addEventListener('pointerdown', () => {
+  canvas.focus();
+  if (game.state === 'title') clickedStart = true;
+});
 
 function newGame() {
   game.world = new World();
@@ -41,7 +46,7 @@ function update(dt) {
   switch (game.state) {
     case 'title':
       game.titleT += dt;
-      if (game.titleT > 0.3 && Input.pressed('confirm')) { Input.consume('confirm'); initAudio(); sfx.bell(196, 0.1); newGame(); }
+      if (game.titleT > 0.3 && (Input.pressed('confirm') || clickedStart)) { Input.consume('confirm'); clickedStart = false; initAudio(); sfx.bell(196, 0.1); newGame(); }
       break;
     case 'play': {
       if (Input.pressed('pause')) { Input.consume('pause'); game.state = 'pause'; break; }
@@ -97,7 +102,7 @@ function drawTitle() {
     text(ctx, k, x, y, '#d9b58a', 'left', 8);
     text(ctx, d, x + (col === 0 ? 62 : 30), y, '#a59d95', 'left', 8);
   });
-  if (Math.sin(t * 4) > -0.3) text(ctx, 'Pressione ENTER para despertar', VW / 2, 222, '#e8e0d0', 'center', 9);
+  if (Math.sin(t * 4) > -0.3) text(ctx, 'Clique ou pressione ENTER para despertar', VW / 2, 222, '#e8e0d0', 'center', 9);
   text(ctx, 'Controle compatível · demonstração — protótipo jogável', VW / 2, 252, '#5a544f', 'center', 7);
 }
 
