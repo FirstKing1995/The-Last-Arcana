@@ -14,6 +14,11 @@ const BIND = {
   ability: ['KeyF'],
   swap: ['Tab'],
   pause: ['Escape', 'KeyP'],
+  item: ['KeyC'],
+  cycle: ['KeyV'],
+  inventory: ['KeyI'],
+  up: ['KeyW', 'ArrowUp'],
+  mute: ['KeyM'],
   confirm: ['Enter', 'KeyE', 'KeyJ', 'Space'],
 };
 
@@ -21,7 +26,7 @@ const BIND = {
 const PAD = {
   0: ['jump', 'confirm'], 1: ['dodge'], 2: ['light'], 3: ['heavy'],
   4: ['parry'], 5: ['ability'], 6: ['spell'], 7: ['interact', 'confirm'],
-  9: ['pause'], 12: ['swap'], 13: ['potion'], 14: ['left'], 15: ['right'],
+  8: ['inventory'], 9: ['pause'], 10: ['item'], 11: ['cycle'], 12: ['swap', 'up'], 13: ['potion'], 14: ['left'], 15: ['right'],
 };
 
 const codeDown = new Set();
@@ -37,6 +42,7 @@ function actionsFor(code) {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (Input.interceptor && !e.repeat && Input.interceptor(e.code)) { e.preventDefault(); return; }
   const acts = actionsFor(e.code);
   if (acts.length) e.preventDefault();
   if (e.repeat) return;
@@ -50,6 +56,7 @@ window.addEventListener('pointerdown', () => { Input.onAny && Input.onAny(); });
 
 export const Input = {
   onAny: null,
+  interceptor: null,
   down(a) {
     if (BIND[a] && BIND[a].some((c) => codeDown.has(c))) return true;
     return padDown.has(a) || virtDown.has(a);

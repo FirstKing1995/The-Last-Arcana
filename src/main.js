@@ -1,5 +1,7 @@
 import { Input } from './input.js';
-import { initAudio, sfx } from './audio.js';
+import { initAudio, sfx, toggleMute, isMuted } from './audio.js';
+import { newProgress, loadProgress, hasSave, clearSave } from './state.js';
+import { setupUI, openMenu, isMenuOpen, menuKey } from './ui.js';
 import { World, VW, VH } from './world.js';
 import { renderWorld, renderBackdrop, text, light, drawVignette, FONT } from './render.js';
 import { drawErrante } from './sprites.js';
@@ -21,49 +23,92 @@ window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', () => setTimeout(fit, 200));
 fit();
 setupTouch(fit);
+setupUI();
+Input.interceptor = (code) => (isMenuOpen() ? menuKey(code) : false);
 
 const CONTROLS = [
   ['A / D', 'mover'], ['W / Espaço', 'pular (S+Espaço desce)'], ['Shift', 'esquiva (segure: correr)'],
   ['J', 'ataque leve (combo)'], ['K', 'pesado (segure: carregar)'], ['L', 'aparar (parry)'],
   ['Q', 'frasco de cura'], ['R', 'feitiço do grimório'], ['F', 'habilidade do Arcano'],
-  ['Tab', 'trocar Arcano'], ['E', 'interagir / finalizar'], ['Esc', 'pausa'],
+  ['Tab', 'trocar Arcano'], ['E', 'interagir / finalizar'], ['C / V', 'usar / trocar item rápido'],
+  ['I', 'inventário'], ['M', 'som liga/desliga'], ['Esc', 'pausa'],
 ];
 
 const TOUCH_CONTROLS = [
   ['Esquerda', 'arraste para mover'], ['↓ + PULAR', 'desce da plataforma'], ['ESQUIVA', 'segure p/ correr'],
   ['ATACAR', 'combo de 3 golpes'], ['PESADO', 'segure para carregar'], ['APARAR', 'no aviso amarelo'],
   ['CURA', 'frasco'], ['FOGO', 'feitiço'], ['ARC', 'habilidade Arcano'],
-  ['⇄', 'trocar Arcano'], ['E', 'falar / finalizar'], ['❚❚', 'pausa'],
+  ['⇄', 'trocar Arcano'], ['E', 'falar / finalizar'], ['ITEM', 'usa o item rápido'],
+  ['INV', 'inventário e equipamento'], ['❚❚', 'pausa'],
 ];
 
-const game = { state: 'title', world: null, time: 0, deathT: 0, titleT: 0 };
+const game = { state: 'title', world: null, time: 0, deathT: 0, titleT: 0, sel: 0, confirmNew: false };
 window.__game = game; // usado pelos testes automatizados
 
 Input.onAny = () => initAudio();
-let clickedStart = false;
-window.addEventListener('pointerdown', () => {
+let tapOption = -1;
+window.addEventListener('pointerdown', (e) => {
   canvas.focus();
-  if (game.state === 'title') { clickedStart = true; if (Input.touchMode) tryFullscreenLandscape(); }
+  if (game.state !== 'title') return;
+  if (Input.touchMode) tryFullscreenLandscape();
+  // toque/clique sobre uma opção do título
+  const r = canvas.getBoundingClientRect();
+  const y = (e.clientY - r.top) / r.height * VH;
+  const opts = titleOptions();
+  const i = Math.floor((y - 122) / 14);
+  tapOption = i >= 0 && i < opts.length ? i : (opts.length === 1 ? 0 : -1);
 }, true);
 
-function newGame() {
-  game.world = new World();
+function titleOptions() { return hasSave() ? ['continuar', 'novo'] : ['novo']; }
+
+function startGame(fromSave) {
+  const prog = (fromSave && loadProgress()) || newProgress();
+  if (!fromSave) clearSave();
+  game.world = new World(prog);
   game.state = 'play';
   Input.clear();
-  game.world.toast('Converse com Elion e descanse na pira [E]', 5);
+  if (!fromSave) game.world.toast('Converse com Elion e descanse na pira [E]', 5);
+  else game.world.toast(`Progresso carregado: ${game.world.checkpoint.name}`, 3);
 }
+
+function chooseTitle(i) {
+  const opt = titleOptions()[i];
+  if (opt === 'novo' && hasSave() && !game.confirmNew) { game.confirmNew = true; sfx.ui(); return; }
+  initAudio(); sfx.bell(196, 0.1);
+  startGame(opt === 'continuar');
+}
+
+// Salva ao sair da página (a posição volta para a última pira)
+document.addEventListener('visibilitychange', () => { if (document.hidden && game.world) game.world.save(); });
 
 function update(dt) {
   game.time += dt;
   Input.pollGamepad();
   const w = game.world;
   switch (game.state) {
-    case 'title':
+    case 'title': {
       game.titleT += dt;
-      if (game.titleT > 0.3 && (Input.pressed('confirm') || clickedStart)) { Input.consume('confirm'); clickedStart = false; initAudio(); sfx.bell(196, 0.1); newGame(); }
+      const n = titleOptions().length;
+      if (Input.pressed('down', 0.1)) { Input.consume('down'); game.sel = (game.sel + 1) % n; game.confirmNew = false; sfx.ui(); }
+      if (Input.pressed('up', 0.1)) { Input.consume('up'); game.sel = (game.sel + n - 1) % n; game.confirmNew = false; sfx.ui(); }
+      if (game.titleT > 0.3 && tapOption >= 0) { const i = tapOption; tapOption = -1; if (game.sel !== i) game.confirmNew = false; game.sel = i; chooseTitle(i); }
+      else if (game.titleT > 0.3 && (Input.pressed('confirm') || Input.pressed('light'))) { Input.consume('confirm'); Input.consume('light'); chooseTitle(game.sel); }
+      tapOption = -1;
+      break;
+    }
+    case 'menu':
+      if (!isMenuOpen()) { game.state = 'play'; Input.clear(); }
       break;
     case 'play': {
       if (Input.pressed('pause')) { Input.consume('pause'); game.state = 'pause'; break; }
+      if (Input.pressed('mute')) { Input.consume('mute'); w.toast(toggleMute() ? 'Som desligado' : 'Som ligado'); }
+      if (!w.dialog && (Input.pressed('inventory') || w.menu)) {
+        const kind = w.menu || 'inventory';
+        Input.consume('inventory'); w.menu = null;
+        game.state = 'menu';
+        openMenu(w, kind, () => { game.state = 'play'; Input.clear(); });
+        break;
+      }
       if (w.dialog) {
         const d = w.dialog;
         const msg = d.lines[d.i][1];
@@ -84,6 +129,7 @@ function update(dt) {
       break;
     }
     case 'pause':
+      if (Input.pressed('mute')) { Input.consume('mute'); toggleMute(); }
       if (Input.pressed('pause') || Input.pressed('confirm')) { Input.clear(); game.state = 'play'; }
       break;
     case 'dead':
@@ -125,8 +171,16 @@ function drawTitle() {
   ctx.globalAlpha = g; ctx.fillStyle = '#c0303a';
   ctx.fillRect(cx, 18, 1, 9); ctx.fillRect(cx - 3, 21, 7, 1);
   ctx.globalAlpha = 1;
-  if (Math.sin(t * 4) > -0.3) text(ctx, Input.touchMode ? 'TOQUE PARA DESPERTAR' : 'ENTER PARA DESPERTAR', cx, 132, '#e8e0d0', 'center', 8);
-  text(ctx, Input.touchMode ? 'gire o celular · botões na tela' : 'esc  ·  controles durante o jogo', cx, 146, '#7a726c', 'center', 8);
+  const opts = titleOptions();
+  opts.forEach((o, i) => {
+    const on = i === game.sel;
+    let label = o === 'continuar' ? 'CONTINUAR' : 'NOVO JOGO';
+    if (o === 'novo' && game.confirmNew && on) label = 'APAGAR SAVE? CONFIRME';
+    const y = 132 + i * 14;
+    if (on) { ctx.fillStyle = '#6d4b32'; ctx.fillRect(cx - 60, y - 9, 120, 12); ctx.fillStyle = '#d4b66f'; ctx.fillRect(cx - 66, y - 5, 3, 3); }
+    text(ctx, label, cx, y, on ? '#fff0d0' : '#8a827b', 'center', 8);
+  });
+  text(ctx, Input.touchMode ? 'toque numa opção · gire o celular' : 'setas e enter · esc mostra os controles', cx, 132 + opts.length * 14 + 8, '#6a635e', 'center', 8);
 }
 
 let lastRender = performance.now();
@@ -139,8 +193,8 @@ function render() {
   if (game.state === 'pause') {
     ctx.globalAlpha = 0.75; ctx.fillStyle = '#0c0b0d'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1;
     text(ctx, 'PAUSA', VW / 2, 28, '#e8d2a8', 'center', 16);
-    (Input.touchMode ? TOUCH_CONTROLS : CONTROLS).forEach(([k, d], i) => { text(ctx, k, 70, 50 + i * 12, '#d9b58a'); text(ctx, d, 160, 50 + i * 12, '#a59d95'); });
-    text(ctx, Input.touchMode ? 'toque em pular para voltar' : 'esc para voltar', VW / 2, 206, '#7a726c', 'center');
+    (Input.touchMode ? TOUCH_CONTROLS : CONTROLS).forEach(([k, d], i) => { text(ctx, k, 70, 46 + i * 11, '#d9b58a'); text(ctx, d, 160, 46 + i * 11, '#a59d95'); });
+    text(ctx, (Input.touchMode ? 'toque em pular para voltar' : 'esc para voltar') + (isMuted() ? ' · som desligado' : ''), VW / 2, 206, '#7a726c', 'center');
   }
   if (game.state === 'dead') {
     const a = Math.min(1, game.deathT / 1.2);
@@ -155,13 +209,19 @@ function render() {
 
 const STEP = 1 / 60;
 let acc = 0, last = performance.now();
+let lastErr = 0;
 function frame(now) {
+  requestAnimationFrame(frame); // agenda antes, para um erro não congelar o jogo
   let d = (now - last) / 1000; last = now;
   if (d > 0.1) d = 0.1;
   acc += d;
-  while (acc >= STEP) { update(STEP); acc -= STEP; }
-  render();
-  requestAnimationFrame(frame);
+  try {
+    while (acc >= STEP) { update(STEP); acc -= STEP; }
+    render();
+  } catch (e) {
+    acc = 0;
+    if (now - lastErr > 2000) { lastErr = now; console.error(e); }
+  }
 }
 requestAnimationFrame(frame);
 canvas.focus();

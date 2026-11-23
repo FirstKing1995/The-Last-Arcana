@@ -87,6 +87,7 @@ export class Projectile {
         if (this.hit.has(e) || !e.alive()) continue;
         if (overlap(this.box(), e.hurtbox())) {
           this.hit.add(e);
+          if (this.onHitEnemy) { this.dead = true; this.onHitEnemy(world, this.x, this.y); break; }
           e.takeDamage(this.dmg, this.posture || 10, Math.sign(this.vx), { kind: 'fire', world });
           if (this.burn) e.applyBurn && e.applyBurn(4);
           world.fx.burst(this.x, this.y, 10, '#ffb070', 70, 0.35);
@@ -138,8 +139,8 @@ export class Shockwave {
 
 // Mancha de cinza com explosão retardada (cinza clara -> laranja -> explode)
 export class AshPatch {
-  constructor(x, y, fuse = 1.3, radius = 22, dmg = 170) {
-    Object.assign(this, { x, y, fuse, radius, dmg, t: 0, warn: 0.45 });
+  constructor(x, y, fuse = 1.3, radius = 22, dmg = 170, owner = 'enemy') {
+    Object.assign(this, { x, y, fuse, radius, dmg, owner, t: 0, warn: Math.min(0.45, fuse) });
   }
   update(dt, world) {
     this.t += dt;
@@ -149,6 +150,7 @@ export class AshPatch {
       world.shake = Math.max(world.shake, 3);
       world.fx.burst(this.x, this.y - 6, 22, '#e17a3d', 120, 0.5, 150, 2);
       world.fx.burst(this.x, this.y - 6, 12, '#625b58', 70, 0.8, 40, 3);
+      if (this.owner === 'player') { world.damageArea(this.x, this.y, this.radius, this.dmg); return; }
       const p = world.player;
       const dx = Math.abs(p.cx() - this.x);
       const dy = Math.abs(p.y + p.h - this.y);

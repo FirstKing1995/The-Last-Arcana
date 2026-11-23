@@ -1,7 +1,7 @@
 import { moveBody, overlap, GRAVITY, TILE } from './physics.js';
 import { MOBS } from './data.js';
 import { sfx } from './audio.js';
-import { Projectile, Shockwave } from './fx.js';
+import { Projectile, Shockwave, AshPatch } from './fx.js';
 
 // Base comum: vida, postura, quebra, queimadura, agressividade e território.
 export class Mob {
@@ -10,6 +10,7 @@ export class Mob {
     this.w = this.def.w; this.h = this.def.h;
     this.spawnX = x; this.spawnY = y;
     this.summoned = !!opts.summoned;
+    this.patrol = opts.patrol || null; // [xA, xB] em px
     this.reset();
   }
   reset() {
@@ -18,7 +19,7 @@ export class Mob {
     this.hp = this.def.hp; this.posture = 0; this.postureCd = 0;
     this.state = 'idle'; this.t = 0; this.dead = false; this.deathT = 0;
     this.facing = -1; this.aggro = false; this.flash = 0; this.burn = 0; this.burnTick = 0;
-    this.hitDone = false; this.guarding = false;
+    this.hitDone = false; this.guarding = false; this.patrolI = 0; this.patrolWait = 0; this.alerted = false;
   }
   alive() { return !this.dead; }
   cx() { return this.x + this.w / 2; }
@@ -96,9 +97,17 @@ export class Mob {
       if (this.burnTick <= 0) { this.burnTick = 0.5; this.hp -= 10; w.fx.number(this.cx(), this.y - 3, 10, '#ffb070'); if (this.hp <= 0) { this.die(); return false; } }
       if (Math.random() < 0.3) w.fx.parts.push({ x: this.x + Math.random() * this.w, y: this.y + Math.random() * this.h, vx: 0, vy: -25, life: 0.4, max: 0.4, color: '#ffb070', grav: 0, size: 1 });
     }
-    const dx = p.cx() - this.cx(), dy = p.cy() - this.cy();
+    // Alvo: o Errante, ou o eco de Caminho Improvável quando estiver por perto
+    const tgt = w.targetFor(this);
+    const dx = tgt.x - this.cx(), dy = p.cy() - this.cy();
     this.dx = dx; this.dist = Math.abs(dx);
-    if (!this.aggro && !p.dead && Math.abs(dx) < (this.aggroRange || 150) && Math.abs(dy) < 70) { this.aggro = true; this.onAggro && this.onAggro(); }
+    const pdx = p.cx() - this.cx();
+    if (!this.aggro && !p.dead && Math.abs(pdx) < (this.aggroRange || 150) && Math.abs(dy) < 70) {
+      this.aggro = true;
+      // Alerta: chama aliados próximos uma única vez
+      if (!this.alerted) { this.alerted = true; w.alertNear(this); }
+      this.onAggro && this.onAggro();
+    }
     // Território: caçadores voltam depois de uma curta perseguição
     if (this.aggro && (Math.abs(this.cx() - this.spawnX) > 260 || p.dead)) this.aggro = false;
     if (this.state === 'broken') {
@@ -130,10 +139,22 @@ export class Mob {
   }
 
   returnHome(dt) {
+    if (this.patrol) return this.doPatrol(dt);
     const d = this.spawnX - this.cx();
     if (Math.abs(d) > 6) { this.facing = Math.sign(d); this.walkToward(this.facing, this.def.speed * 0.7); }
     else this.vx = 0;
     if (!this.aggro) this.hp = Math.min(this.def.hp, this.hp + this.def.hp * 0.2 * dt);
+  }
+
+  // Patrulha: rota entre dois marcos, com pausa em cada um
+  doPatrol(dt) {
+    if (this.patrolWait > 0) { this.patrolWait -= dt; this.vx = 0; return; }
+    const tx = this.patrol[this.patrolI];
+    const d = tx - this.cx();
+    if (Math.abs(d) < 4) { this.patrolI = 1 - this.patrolI; this.patrolWait = 1.2 + Math.random(); this.vx = 0; return; }
+    this.facing = Math.sign(d);
+    this.walkToward(this.facing, this.def.speed * 0.55);
+    if (this.vx === 0) { this.patrolI = 1 - this.patrolI; this.patrolWait = 0.8; }
   }
 
   update(dt) {
@@ -316,11 +337,48 @@ export class Sino extends Mob {
         this.world.fx.add(new Shockwave(this.cx() - 12, gy, -1, this.def.dmg, { speed: 150, dist: 200 }));
         this.world.fx.add(new Shockwave(this.cx() + 12, gy, 1, this.def.dmg, { speed: 150, dist: 200 }));
         this.world.shake = Math.max(this.world.shake, 3);
-        if (!this.summonedOnce) { this.summonedOnce = true; this.world.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 150, gy); }
+        if (!this.summonedOnce && !(this.type === 'sino' && this.world.prog.flags.cryptSilenced)) { this.summonedOnce = true; this.world.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 150, gy); }
         this.set('recover');
       }
     }
   }
 }
 
-export const MOB_CLASSES = { cinzeiro: Cinzeiro, braseiro: Braseiro, rasteja: Rasteja, gralha: Gralha, sino: Sino };
+// Mini-chefe da Cripta do Campanário: badaladas duplas e uma chuva de fuligem.
+export class SinoElite extends Sino {
+  constructor(...a) { super(...a); this.aggroRange = 200; this.isElite = true; }
+  think() {
+    const s = this.state;
+    this.vx = 0;
+    if (!this.aggro) return;
+    this.facing = Math.sign(this.dx) || this.facing;
+    const w = this.world;
+    if (s === 'idle' || s === 'recover') {
+      if (this.t > (s === 'recover' ? 1.3 : 0.8)) { this.cycle = (this.cycle || 0) + 1; this.set(this.cycle % 3 === 0 ? 'rainWind' : 'wind'); }
+    } else if (s === 'wind') {
+      if (this.t > 0.85) {
+        sfx.crackedBell();
+        const gy = this.y + this.h;
+        this.waves = (this.waves || 0) + 1;
+        w.fx.add(new Shockwave(this.cx() - 14, gy, -1, this.def.dmg, { speed: 160, dist: 230 }));
+        w.fx.add(new Shockwave(this.cx() + 14, gy, 1, this.def.dmg, { speed: 160, dist: 230 }));
+        w.shake = Math.max(w.shake, 3);
+        if (!this.summonedOnce) { this.summonedOnce = true; w.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 120, gy); }
+        if (this.waves % 2 === 1) { this.set('wind'); this.t = 0.35; } else this.set('recover');
+      }
+    } else if (s === 'rainWind') {
+      if (this.t > 1.0) {
+        sfx.crackedBell();
+        const p = w.player;
+        for (let i = 0; i < 4; i++) {
+          const x = p.cx() + (i - 1.5) * 36;
+          const gy = w.level.solidGroundBelow(x, p.y);
+          w.fx.add(new AshPatch(x, gy, 1.1, 18, 150));
+        }
+        this.set('recover');
+      }
+    }
+  }
+}
+
+export const MOB_CLASSES = { cinzeiro: Cinzeiro, braseiro: Braseiro, rasteja: Rasteja, gralha: Gralha, sino: Sino, sinoElite: SinoElite };

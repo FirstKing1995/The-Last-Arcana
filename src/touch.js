@@ -44,8 +44,10 @@ const BUTTONS = [
 ];
 const TOP = [
   ['❚❚', ['pause'], 12],
-  ['⇄', ['swap'], 62],
-  ['ARC', ['ability'], 112],
+  ['INV', ['inventory'], 62],
+  ['⇄', ['swap'], 112],
+  ['ARC', ['ability'], 162],
+  ['ITEM', ['item'], 212],
 ];
 
 function makeButton(root, label, actions, cls, style) {

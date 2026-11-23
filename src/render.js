@@ -2,8 +2,8 @@
 // Paleta-base (Atlas, Vol. III): carvão #25252A, cinza #625B58, brasa #B66A3B, tecido queimado #D9B58A, runa #A72F2F.
 import { TILE } from './physics.js';
 import { VW, VH } from './world.js';
-import { drawErrante, drawMob, drawAsgmor, drawNPC } from './sprites.js';
-import { ARCANA } from './data.js';
+import { drawErrante, drawMob, drawAsgmor, drawNPC, drawMorren, drawYsara, drawFauna, drawEcho } from './sprites.js';
+import { ARCANA, ITEMS, HERBS } from './data.js';
 import { Input } from './input.js';
 
 export const FONT = 'Silkscreen, "Courier New", monospace';
@@ -204,6 +204,17 @@ function plankTile(v) {
   });
 }
 
+function caveTile(v) {
+  return makeTile(`cave${v}`, (c) => {
+    c.fillStyle = '#141216'; c.fillRect(0, 0, 16, 16);
+    c.fillStyle = '#19171c';
+    const o = v % 2 ? 8 : 0;
+    c.fillRect(o, 1, 7, 6); c.fillRect((o + 8) % 16, 9, 7, 6); c.fillRect((o + 12) % 16, 1, 3, 6);
+    c.fillStyle = '#0e0c10'; c.fillRect(0, 7, 16, 1); c.fillRect(0, 15, 16, 1);
+    if (v === 3) { c.fillStyle = '#2a2024'; c.fillRect(5, 11, 2, 2); }
+  });
+}
+
 function drawTiles(ctx, world, cam, time) {
   const lvl = world.level;
   const x0 = Math.floor(cam.x / TILE), x1 = Math.ceil((cam.x + VW) / TILE);
@@ -211,9 +222,9 @@ function drawTiles(ctx, world, cam, time) {
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       const c = lvl.get(tx, ty);
-      if (c === '.') continue;
       const sx = tx * TILE - cam.x, sy = ty * TILE - cam.y;
       const v = Math.floor(hash(tx * 13 + ty * 7) * 4);
+      if (c === '.' || c === '=') { if (lvl.isCave(tx, ty)) ctx.drawImage(caveTile(v), sx, sy); if (c === '.') continue; }
       if (c === '#') {
         let depth = 0;
         if (lvl.solid(tx, ty - 1)) depth = lvl.solid(tx, ty - 2) ? 2 : 1;
@@ -230,6 +241,13 @@ function drawTiles(ctx, world, cam, time) {
         ctx.fillStyle = '#e17a3d';
         ctx.fillRect(sx + 7, sy, 1, 5); ctx.fillRect(sx + 6, sy + 5, 1, 4); ctx.fillRect(sx + 8, sy + 9, 1, 7); ctx.fillRect(sx + 3, sy + 7, 3, 1); ctx.fillRect(sx + 10, sy + 3, 2, 1);
         ctx.globalAlpha = 1;
+      } else if (c === 'D') {
+        // alçapão de madeira do atalho
+        ctx.fillStyle = '#3a2a22'; ctx.fillRect(sx, sy, TILE, 6);
+        ctx.fillStyle = '#5a4030'; ctx.fillRect(sx, sy, TILE, 1);
+        ctx.fillStyle = '#21181a'; ctx.fillRect(sx + 5, sy, 1, 6); ctx.fillRect(sx + 11, sy, 1, 6);
+        ctx.fillStyle = '#6d6c73'; ctx.fillRect(sx + 2, sy + 2, 2, 2);
+        ctx.fillStyle = '#121014'; ctx.fillRect(sx, sy + 6, TILE, 10);
       } else if (c === 'G') {
         ctx.fillStyle = '#3d3238'; ctx.fillRect(sx + 1, sy, 14, TILE);
         ctx.fillStyle = '#2a2328'; ctx.fillRect(sx + 1, sy, 2, TILE); ctx.fillRect(sx + 1, sy + 7, 14, 1);
@@ -304,6 +322,30 @@ function drawProp(ctx, pr, cam, time) {
       R(-7, -h, 14, 2, '#625b58');
       break;
     }
+    case 'forge': {
+      // forja portátil de Ysara, alimentada por fragmentos de luz
+      R(-12, -12, 24, 12, '#0e0d10'); R(-11, -11, 22, 11, '#3a373f'); R(-11, -11, 22, 2, '#4a4650');
+      R(-8, -9, 16, 5, '#1a1416');
+      const f = Math.sin(time * 10);
+      R(-6, -9, 12, 3, f > 0 ? '#e17a3d' : '#d06030'); R(-3, -10, 6, 2, '#ffd27a');
+      R(8, -22, 4, 11, '#2b2a2f'); R(8, -22, 4, 1, '#4a4650');
+      R(14, -6, 8, 4, '#55545a'); R(16, -2, 4, 2, '#2b2a2f'); R(13, -7, 10, 1, '#6e6d74');
+      break;
+    }
+    case 'torch': {
+      R(-1, -2, 3, 8, '#3a2a1e'); R(-2, -2, 5, 1, '#5a4030');
+      const f = Math.sin(time * 14 + pr.x) > 0 ? 1 : 0;
+      R(-1, -6 - f, 3, 4, '#e17a3d'); R(0, -8 - f, 1, 3, '#ffd27a');
+      break;
+    }
+    case 'cryptgate': {
+      // arco de pedra que marca a descida para a cripta
+      R(-26, -40, 6, 40, '#0e0d10'); R(20, -40, 6, 40, '#0e0d10');
+      R(-25, -39, 4, 39, '#2b292e'); R(21, -39, 4, 39, '#2b292e');
+      for (let k = 0; k < 48; k++) R(-24 + k, -40 - Math.round(Math.sin(k / 47 * Math.PI) * 8), 1, 4, '#2b292e');
+      R(-2, -46, 4, 4, '#6d4b32'); R(-1, -42, 2, 1, '#e17a3d');
+      break;
+    }
     case 'bigbell': {
       // grande sino do campanário caído, correntes e anéis de pedra no chão
       for (let k = 0; k < 4; k++) {
@@ -347,6 +389,43 @@ function drawInteractable(ctx, it, world, cam, time) {
     if (Math.random() < 0.25) world.fx.parts.push({ x: it.x + (Math.random() - 0.5) * 8, y: it.y - 22, vx: (Math.random() - 0.5) * 8, vy: -26, life: 1, max: 1, color: Math.random() < 0.5 ? '#ffb070' : '#e17a3d', grav: 0, size: 1 });
   } else if (it.type === 'elion') {
     drawNPC(ctx, sx, sy, time);
+  } else if (it.type === 'morren') {
+    drawMorren(ctx, sx, sy, time);
+  } else if (it.type === 'ysara') {
+    drawYsara(ctx, sx, sy, time, true);
+  } else if (it.type === 'herb') {
+    if (it.state !== 0) { R(-1, -1, 3, 1, '#3a3236'); return; }
+    const h = HERBS[it.herb];
+    const sway = Math.round(Math.sin(time * 2 + it.x) * 1);
+    if (it.herb === 'liquen') { R(-4, -2, 8, 2, '#5a3428'); R(-3, -3, 2, 1, h.color); R(1, -3, 3, 1, h.color); R(-1, -4, 1, 1, '#ffb070'); }
+    else if (it.herb === 'salvia') { for (let k = -2; k <= 2; k += 2) { R(k + sway * (k === 0 ? 1 : 0), -7 + Math.abs(k), 1, 7 - Math.abs(k), '#5f6a52'); R(k - 1, -6 + Math.abs(k), 1, 2, h.color); } }
+    else { R(0, -8, 1, 8, '#5f6a52'); R(-2 + sway, -11, 5, 3, h.color); R(-1 + sway, -12, 3, 1, '#ffffff'); R(0 + sway, -10, 1, 1, '#e17a3d'); }
+    // brilho curto de planta coletável
+    if (Math.sin(time * 3 + it.x) > 0.85) { ctx.fillStyle = '#fff3c4'; ctx.fillRect(sx + 2, sy - 10, 1, 1); }
+  } else if (it.type === 'falsebell') {
+    if (it.state === 2) { R(-5, 92, 10, 3, '#4a3424'); return; }
+    const sw = it.state === 1 ? Math.round(Math.sin(time * 18) * 2) : Math.round(Math.sin(time * 1.4 + it.x) * 1);
+    R(0, 0, 1, 8, '#4a4650');
+    R(-5 + sw, 8, 11, 2, '#0e0d10'); R(-6 + sw, 10, 13, 9, '#0e0d10');
+    R(-4 + sw, 9, 9, 2, '#6d4b32'); R(-5 + sw, 11, 11, 7, '#8b633f'); R(-5 + sw, 11, 3, 7, '#6d4b32');
+    R(-5 + sw, 18, 11, 1, it.state === 1 ? '#ffd27a' : '#3a2a1e'); // sem badalo: pista visual de sino falso
+  } else if (it.type === 'vent') {
+    R(-6, -20, 6, 20, '#0e0d10'); R(-5, -19, 4, 18, '#2b292e');
+    for (let k = 0; k < 4; k++) R(-4, -17 + k * 4, 3, 2, it.phase === 'gust' ? '#9a918a' : it.phase === 'warn' ? '#625b58' : '#1d1c20');
+  } else if (it.type === 'lever') {
+    R(-5, -4, 10, 4, '#0e0d10'); R(-4, -3, 8, 3, '#3a373f');
+    const on = world.flags.shortcut;
+    const ang = on ? 0.6 : -0.6;
+    for (let k = 0; k < 10; k++) R(Math.round(Math.sin(ang) * k), -3 - Math.round(Math.cos(ang) * k), 1, 1, '#6d6c73');
+    R(Math.round(Math.sin(ang) * 10) - 1, -15, 3, 3, on ? '#7fc48a' : '#c0303a');
+  } else if (it.type === 'portal') {
+    if (!world.flags.bossDefeated || world.arenaLocked) return;
+    for (let k = 0; k < 14; k++) {
+      const a = time * 2 + k * 0.45;
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(a * 2);
+      R(Math.round(Math.cos(a) * 7), -16 + Math.round(Math.sin(a) * 14), 2, 2, k % 2 ? '#d9b58a' : '#9a918a');
+    }
+    ctx.globalAlpha = 1;
   } else if (it.type === 'chest') {
     const open = world.flags.chests[it.id];
     R(-9, -11, 18, 11, '#0e0d10');
@@ -372,13 +451,21 @@ function lights(ctx, world, cam, time) {
     if (it.type === 'elion') L(it.x + 7, it.y - 24, 14, '#5aa6a0', 0.5);
     if (it.type === 'chest' && !world.flags.chests[it.id]) L(it.x, it.y - 6, 18, '#b0893a', 0.35);
     if (it.type === 'stone') L(it.x, it.y - 12, 16, '#b65a2b', 0.3);
+    if (it.type === 'morren') L(it.x - 11, it.y - 8, 16, '#b0893a', 0.5);
+    if (it.type === 'portal' && world.flags.bossDefeated && !world.arenaLocked) L(it.x, it.y - 16, 30, '#a08a6a', 0.5);
+    if (it.type === 'herb' && it.state === 0) L(it.x, it.y - 5, 8, '#7a7a5a', 0.3);
   }
   for (const pr of world.level.props) {
+    if (pr.type === 'torch') L(pr.x, pr.y - 6, 40, '#b65a2b', 0.5 + Math.sin(time * 9 + pr.x) * 0.05);
+    if (pr.type === 'forge') L(pr.x, pr.y - 8, 34, '#c0602a', 0.55);
     if (pr.type === 'house') L(pr.x + 14, pr.y - 21, 22, '#b65a2b', 0.45);
     if (pr.type === 'bellpost') L(pr.x + 13, pr.y - 30, 10, '#b65a2b', 0.25);
   }
   const p = world.player;
   L(p.cx() + (p.facing > 0 ? -1 : 1), p.y + 10, 10, '#a72f2f', 0.45 + Math.sin(time * 4) * 0.15);
+  // na cripta o Errante carrega um pouco de luz própria
+  if (world.level.isCave(Math.floor(p.cx() / TILE), Math.floor(p.cy() / TILE))) L(p.cx(), p.cy(), 60, '#4a3a32', 0.6);
+  for (const l of world.loot) L(l.x, l.y - 6, 18, '#b0893a', 0.6);
   if (p.action === 'cast') L(p.cx() + p.facing * 8, p.y + 8, 20, '#d06a30', 0.6);
   for (const m of [...world.mobs, ...world.summons]) {
     if (m.dead) continue;
@@ -411,6 +498,25 @@ function drawVignette(ctx) {
     c.fillStyle = g; c.fillRect(0, 0, VW, VH);
   }
   ctx.drawImage(vignette, 0, 0);
+}
+
+function drawBreakable(ctx, b, cam) {
+  const sx = Math.round(b.x - cam.x), sy = Math.round(b.y - cam.y);
+  if (sx < -20 || sx > VW + 20) return;
+  const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(sx + x, sy + y, w, h); };
+  if (b.broken) { R(-6, -2, 4, 2, '#3a2a22'); R(1, -1, 5, 1, '#4a3424'); return; }
+  if (b.type === 'pot') {
+    R(-5, -12, 10, 12, '#0e0d10'); R(-4, -11, 8, 11, '#6d4b32'); R(-4, -11, 2, 11, '#4a3424'); R(-2, -13, 4, 2, '#5a3d28'); R(-3, -6, 6, 1, '#8b633f');
+  } else {
+    R(-6, -12, 12, 12, '#0e0d10'); R(-5, -11, 10, 10, '#4a3424'); R(-5, -11, 10, 1, '#6d4b32'); R(-5, -6, 10, 1, '#2a1e16'); R(-1, -11, 1, 10, '#2a1e16');
+  }
+}
+
+function drawLoot(ctx, l, cam, time) {
+  const sx = Math.round(l.x - cam.x), sy = Math.round(l.y - cam.y) - 6 - Math.round(Math.sin(time * 3) * 2);
+  ctx.fillStyle = '#0e0d10'; ctx.fillRect(sx - 4, sy - 4, 9, 9);
+  ctx.fillStyle = '#d4b66f'; ctx.fillRect(sx - 3, sy - 3, 7, 7);
+  ctx.fillStyle = '#fff3c4'; ctx.fillRect(sx - 1, sy - 6, 3, 2); ctx.fillRect(sx, sy - 2, 1, 5);
 }
 
 // ---------- HUD ----------
@@ -490,7 +596,7 @@ function drawHUD(ctx, world, time, dt) {
   }, 0, keys ? 'Q' : null);
   for (let i = 0; i < 2; i++) {
     const a = p.arcana[i];
-    const cd = a ? (p.cooldowns[a] || 0) / ARCANA[a].ability.cd : 0;
+    const cd = a ? (p.cooldowns[a] || 0) / ARCANA[a].abilities[0].cd : 0;
     slot(ctx, 36 + i * 24, by, null, p.activeSlot === i, (c, x, y) => {
       if (!a) { c.fillStyle = '#2a262b'; c.fillRect(x + 6, y + 8, 6, 2); return; }
       // carta de tarô em miniatura
@@ -500,6 +606,20 @@ function drawHUD(ctx, world, time, dt) {
       c.fillStyle = '#d4b66f'; c.fillRect(x + 8, y + 13, 2, 1);
     }, cd, keys ? (i === 0 ? 'F' : 'Tab') : null);
   }
+  // item rápido (bomba, óleo, selo)
+  const q = world.prog.quick, qn = world.prog.items[q] || 0;
+  slot(ctx, 114, by, String(qn), false, (c, x, y) => {
+    if (q === 'bomba') { c.fillStyle = '#2b2a2f'; c.fillRect(x + 5, y + 7, 8, 8); c.fillStyle = '#6d4b32'; c.fillRect(x + 8, y + 4, 2, 3); c.fillStyle = '#ffb070'; c.fillRect(x + 9, y + 3, 1, 1); }
+    else if (q === 'oleo') { c.fillStyle = '#5a3d28'; c.fillRect(x + 6, y + 6, 6, 9); c.fillStyle = '#e17a3d'; c.fillRect(x + 7, y + 9, 4, 5); c.fillStyle = '#c9c1b8'; c.fillRect(x + 7, y + 4, 4, 2); }
+    else { c.fillStyle = '#d9b58a'; c.fillRect(x + 5, y + 5, 8, 9); c.fillStyle = '#a72f2f'; c.fillRect(x + 8, y + 7, 2, 5); c.fillRect(x + 7, y + 9, 4, 1); }
+    if (p.itemCd > 0 && q === 'bomba') { c.globalAlpha = 0.6; c.fillStyle = '#000'; c.fillRect(x, y, 18, Math.round(18 * p.itemCd / 12)); c.globalAlpha = 1; }
+  }, 0, keys ? 'C' : null);
+  // moedas
+  ctx.fillStyle = '#0a090c'; ctx.fillRect(24 + 88 + 6, 15, 3, 3);
+  ctx.fillStyle = '#d4b66f'; ctx.fillRect(24 + 88 + 7, 16, 3, 3);
+  text(ctx, String(world.prog.coins), 24 + 88 + 13, 22, '#e8c96a', 'left', 8);
+  if (p.oil > 0) text(ctx, `óleo ${Math.ceil(p.oil)}s`, 24, 36, '#ffb070', 'left', 8);
+  if (p.empowered > 0) text(ctx, 'risco calculado', 24, p.oil > 0 ? 46 : 36, '#f6f1e8', 'left', 8);
   slot(ctx, 88, by, null, false, (c, x, y) => {
     if (!world.flags.brasa) return;
     const ok = p.foco >= 18;
@@ -525,7 +645,10 @@ function drawHUD(ctx, world, time, dt) {
     const it = world.nearbyInteractable();
     let label = null, lx = 0, ly = 0;
     if (fin) { label = 'E  FINALIZAR'; lx = fin.cx(); ly = fin.y - 18; }
-    else if (it) { label = 'E  ' + { shrine: 'DESCANSAR', elion: 'CONVERSAR', chest: 'ABRIR', stone: 'LER' }[it.type]; lx = it.x; ly = it.y - 36; }
+    else if (it) {
+      label = 'E  ' + { shrine: 'DESCANSAR', elion: 'CONVERSAR', chest: 'ABRIR', stone: 'LER', morren: 'COMÉRCIO', ysara: 'FORJA', herb: 'COLHER', lever: 'PUXAR ALAVANCA', bigbell: 'TOCAR O SINO (REVANCHE)', portal: 'VOLTAR A CINZEIRAL' }[it.type];
+      lx = it.x; ly = it.y - (it.type === 'herb' ? 22 : 36);
+    }
     if (label) {
       const x = Math.round(lx - world.cam.x), y = Math.round(ly - world.cam.y);
       ctx.font = `8px ${FONT}`;
@@ -571,12 +694,18 @@ export function renderWorld(ctx, world, time, dt) {
   const cam = { x: world.cam.x, y: world.cam.y };
   if (world.shake > 0) { cam.x += (Math.random() - 0.5) * world.shake; cam.y += (Math.random() - 0.5) * world.shake; }
   cam.x = Math.round(cam.x); cam.y = Math.round(cam.y);
+  const pl = world.player;
+  const underground = pl.y > 24 * TILE && world.level.isCave(Math.floor(pl.cx() / TILE), Math.floor(pl.cy() / TILE));
   backdrop(ctx, cam, time, world);
-  ashFall(ctx, cam, time, world, 0);
+  if (!underground) ashFall(ctx, cam, time, world, 0);
   for (const pr of world.level.props) drawProp(ctx, pr, cam, time);
   for (const it of world.interactables) drawInteractable(ctx, it, world, cam, time);
   drawTiles(ctx, world, cam, time);
   lights(ctx, world, cam, time);
+  for (const b of world.breakables) drawBreakable(ctx, b, cam);
+  for (const f of world.fauna) { const fx = f.fx - cam.x; if (fx > -20 && fx < VW + 20) drawFauna(ctx, f, fx, f.fy - cam.y, time); }
+  for (const l of world.loot) drawLoot(ctx, l, cam, time);
+  if (world.echo) drawEcho(ctx, world.echo, world.echo.x - cam.x, world.echo.y - cam.y, time);
   for (const m of [...world.mobs, ...world.summons]) {
     const sx = m.cx() - cam.x, sy = m.y + m.h - cam.y;
     if (sx < -50 || sx > VW + 50) continue;
@@ -587,7 +716,7 @@ export function renderWorld(ctx, world, time, dt) {
   const p = world.player;
   drawErrante(ctx, p, p.cx() - cam.x, p.y + p.h - cam.y, time);
   world.fx.draw(ctx, cam);
-  ashFall(ctx, cam, time, world, 1);
+  if (!underground) ashFall(ctx, cam, time, world, 1);
   drawVignette(ctx);
   if (world.flashScreen > 0) { ctx.globalAlpha = world.flashScreen * 3; ctx.fillStyle = '#fff3c4'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
   drawHUD(ctx, world, time, dt);

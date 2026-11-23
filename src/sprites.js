@@ -139,7 +139,7 @@ function legs(c, ox, oy, pose, tuck = 0) {
   rect(c, ox + f, oy - 1 - fl, 3, 1, '#1d1922');
 }
 
-export function drawErrante(ctx, p, sx, sy, time) {
+export function drawErrante(ctx, p, sx, sy, time, alphaMul = 1, outlineCol) {
   const a = p.action, t = p.t;
   const flash = p.flash > 0 && Math.floor(p.flash * 40) % 2 === 0;
   let alpha = 1;
@@ -195,7 +195,7 @@ export function drawErrante(ctx, p, sx, sy, time) {
     line(c, shx, shy, hx, hy, '#c9c0b2', 2);
     blade(c, hx, hy, ang, len);
     px(c, hx, hy, '#ece6dc');
-  }, { flash, alpha });
+  }, { flash, alpha: alpha * alphaMul, outline: outlineCol });
 
   if (p.perfectFlash > 0) {
     ctx.globalAlpha = p.perfectFlash * 2.5;
@@ -335,8 +335,21 @@ export function drawMob(ctx, m, sx, sy, time) {
         else c.drawImage(sprite(up ? 'wingU' : 'wingD', up ? WING_UP : WING_DN, WING_PAL), ox - 7, up ? oy - 11 : oy - 5);
         break;
       }
+      case 'sinoElite':
       case 'sino': {
-        const sw = st === 'wind' ? Math.round(Math.sin(time * 40) * 2) : 0;
+        const big = m.type === 'sinoElite';
+        const sw = (st === 'wind' || st === 'rainWind') ? Math.round(Math.sin(time * 40) * 2) : 0;
+        if (big) {
+          rect(c, ox - 1, oy - 40, 2, 6, '#3b2f28');
+          bellShape(c, ox + sw, oy - 34, 32, 28, '#5a4a3a', '#3a2e24', '#7a6a52');
+          rect(c, ox - 16 + sw, oy - 6, 32, 2, '#4a3a2e');
+          const ck = st === 'wind' || st === 'rainWind' ? '#ffe08a' : '#e17a3d';
+          line(c, ox + 3 + sw, oy - 32, ox - 2 + sw, oy - 20, ck); line(c, ox - 2 + sw, oy - 20, ox + 5 + sw, oy - 9, ck);
+          line(c, ox - 9 + sw, oy - 26, ox - 6 + sw, oy - 14, ck); line(c, ox + 9 + sw, oy - 22, ox + 11 + sw, oy - 12, ck);
+          rect(c, ox - 3 + sw, oy - 4, 6, 4, '#2a211b'); px(c, ox + sw, oy - 2, '#ffb070');
+          for (let i = 0; i < 3; i++) px(c, ox - 12 + i * 12 + sw, oy - 30 + (i % 2) * 3, '#d4b66f');
+          break;
+        }
         rect(c, ox - 1, oy - 33, 2, 4, '#3b2f28');
         rect(c, ox - 3, oy - 30, 6, 2, '#4a3424');
         bellShape(c, ox + sw, oy - 28, 26, 22, '#6d4b32', '#4a3424', '#8b633f');
@@ -499,4 +512,90 @@ export function drawNPC(ctx, sx, sy, time) {
     const g = Math.sin(time * 2) > 0;
     rect(c, ox + 6, oy - 25, 3, 3, g ? '#d6f4ee' : '#b6e0d8');
   });
+}
+
+// ---------- Morren, o Mercador de Mil Coisas (loja dobrável nas costas) ----------
+const MORREN = [
+  '..bbbbbbb.......',
+  '.bBBBBBBBb......',
+  '.bBkBBkBBb......',
+  '.bBBBBBBBbhhh...',
+  '.bBkBBkBBhHHHh..',
+  '.bBBBBBBBhffff..',
+  '.bbbbbbbbhfFeF..',
+  '.bmmmmmmbhffff..',
+  '.bBBBBBBbcccc...',
+  '.bBkBBkBBcCCCcc.',
+  '.bBBBBBBBcCCCc..',
+  '.bbbbbbbbcCCCc..',
+  '........ccCCCc..',
+  '........cCCCCc..',
+  '........cc..cc..',
+];
+const MORREN_PAL = { b: '#3a2a1e', B: '#6d4b32', k: '#b0893a', m: '#8a8f96', h: '#5a4a3a', H: '#7a6248', f: '#c4a88a', F: '#d8bea0', e: '#2a2a30', c: '#3f4a3a', C: '#556450' };
+
+// ---------- Ysara, a Ferreira das Brasas Frias ----------
+const YSARA = [
+  '....rrrr....',
+  '...rrrrrr...',
+  '...rssssr...',
+  '...rsSeSr...',
+  '....ssss....',
+  '..llaaaall..',
+  '.lLlaaaalLl.',
+  '.sQlaaaalQs.',
+  '.s.laaaal.s.',
+  '...lllllll..',
+  '...ll...ll..',
+  '...dd...dd..',
+];
+const YSARA_PAL = { r: '#7a2e24', s: '#b88a6a', S: '#d0a27e', e: '#2a2026', l: '#3a2f2a', L: '#5a4a40', a: '#5a3d28', Q: '#c0603a', d: '#1d1922' };
+
+export function drawMorren(ctx, sx, sy, time) {
+  outlined(ctx, sx, sy, -1, (c, ox, oy) => {
+    const bob = Math.sin(time * 2) > 0.7 ? 1 : 0;
+    c.drawImage(sprite('morren', MORREN, MORREN_PAL), ox - 9, oy - 15 + bob);
+    // lanterna pendurada na mochila
+    line(c, ox - 9, oy - 13 + bob, ox - 11, oy - 9 + bob, '#3a2a1e');
+    rect(c, ox - 12, oy - 9 + bob, 3, 3, Math.sin(time * 6) > 0 ? '#ffd27a' : '#e1a23d');
+  });
+}
+export function drawYsara(ctx, sx, sy, time, working) {
+  outlined(ctx, sx, sy, 1, (c, ox, oy) => {
+    c.drawImage(sprite('ysara', YSARA, YSARA_PAL), ox - 6, oy - 12 - 1);
+    // martelo
+    const up = working && Math.floor(time * 3) % 2 === 0;
+    const ang = up ? -1.9 : 0.5;
+    const hx = ox + 4 + Math.cos(ang) * 6, hy = oy - 7 + Math.sin(ang) * 6;
+    line(c, ox + 4, oy - 7, hx, hy, '#6d4b32');
+    rect(c, hx - 1, hy - 2, 4, 3, '#55545a');
+  });
+}
+
+// ---------- fauna neutra: rato-de-brasa, lagarto de fuligem, gralha cinzenta ----------
+export function drawFauna(ctx, f, sx, sy, time) {
+  if (f.state === 'gone') return;
+  outlined(ctx, sx, sy, f.facing, (c, ox, oy) => {
+    if (f.kind === 'rato') {
+      const step = f.state === 'flee' ? Math.floor(time * 20) % 2 : 0;
+      rect(c, ox - 3, oy - 3, 6, 3, '#3a3236'); rect(c, ox + 2, oy - 4, 2, 2, '#3a3236');
+      px(c, ox + 3, oy - 4, '#e17a3d'); rect(c, ox - 6, oy - 2, 3, 1, '#6d4b32');
+      px(c, ox - 2 + step, oy - 1, '#1d1922'); px(c, ox + 1 - step, oy - 1, '#1d1922');
+    } else if (f.kind === 'lagarto') {
+      rect(c, ox - 4, oy - 2, 8, 2, '#2c2a30'); rect(c, ox + 3, oy - 3, 3, 2, '#2c2a30');
+      rect(c, ox - 8, oy - 1, 4, 1, '#2c2a30'); px(c, ox + 5, oy - 3, '#d56a32');
+      px(c, ox - 2, oy, '#1d1922'); px(c, ox + 2, oy, '#1d1922');
+    } else {
+      const flying = f.state === 'flee';
+      const flap = flying && Math.floor(time * 14) % 2 === 0;
+      rect(c, ox - 3, oy - 4, 6, 3, '#4a4650'); rect(c, ox + 2, oy - 5, 2, 2, '#4a4650'); px(c, ox + 4, oy - 4, '#a65d38');
+      if (flying) rect(c, ox - 2, flap ? oy - 7 : oy - 2, 4, 2, '#36333b');
+      else { px(c, ox - 1, oy - 1, '#a65d38'); px(c, ox + 1, oy - 1, '#a65d38'); }
+    }
+  });
+}
+
+export function drawEcho(ctx, e, sx, sy, time) {
+  const ghost = { facing: e.facing, action: null, t: 0, flash: 0, invuln: 0, dead: false, onGround: true, vx: 0, vy: 0, walkPhase: 0, perfectFlash: 0 };
+  drawErrante(ctx, ghost, sx, sy, time, Math.min(0.55, e.t) * (0.8 + Math.sin(time * 20) * 0.2), '#d9b58a');
 }

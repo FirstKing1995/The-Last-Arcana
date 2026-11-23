@@ -2,13 +2,21 @@
 let ac = null;
 let master = null;
 
+let muted = false;
+export function toggleMute() {
+  muted = !muted;
+  if (master) master.gain.value = muted ? 0 : 0.45;
+  return muted;
+}
+export function isMuted() { return muted; }
+
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   ac = new AC();
   master = ac.createGain();
-  master.gain.value = 0.45;
+  master.gain.value = muted ? 0 : 0.45;
   master.connect(ac.destination);
   startWind();
 }

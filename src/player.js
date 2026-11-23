@@ -1,21 +1,26 @@
 import { Input } from './input.js';
 import { sfx } from './audio.js';
 import { moveBody, overlap, GRAVITY, TILE } from './physics.js';
-import { PLAYER, SPELLS, ARCANA } from './data.js';
-import { Projectile } from './fx.js';
+import { PLAYER, SPELLS, ARCANA, WEAPONS, ITEMS } from './data.js';
+import { Projectile, AshPatch } from './fx.js';
+import { masteryLevel, weaponDamageMul } from './state.js';
 
 export class Player {
   constructor(world, x, y) {
     this.world = world;
+    this.prog = world.prog;
     this.w = 10; this.h = 22;
     this.maxHp = PLAYER.hp; this.maxVigor = PLAYER.vigor; this.maxFoco = PLAYER.foco;
-    this.maxPotions = PLAYER.potions;
-    this.arcana = [null, null]; // [primário, secundário]
     this.activeSlot = 0;
     this.cooldowns = {};
-    this.relics = [];
     this.respawn(x, y);
   }
+
+  get maxPotions() { return this.prog.maxPotions; }
+  set maxPotions(v) { this.prog.maxPotions = v; }
+  get arcana() { return this.prog.arcana; }
+  get relics() { return this.prog.relicSlots.filter(Boolean); }
+  weapon() { return WEAPONS[this.prog.equipped] || WEAPONS.fio; }
 
   respawn(x, y) {
     this.x = x - this.w / 2; this.y = y - this.h;
@@ -28,7 +33,8 @@ export class Player {
     this.invuln = 0; this.flash = 0; this.dead = false; this.deadT = 0;
     this.vigorDelay = 0; this.coyote = 0; this.dropThrough = 0;
     this.running = false; this.walkPhase = 0;
-    this.lastDodge = -99; this.perfectFlash = 0;
+    this.lastDodge = -99; this.lastEcho = -99; this.perfectFlash = 0;
+    this.empowered = 0; this.ashCharge = 0; this.oil = 0; this.itemCd = 0;
     this.cooldowns = {};
   }
 
@@ -39,18 +45,20 @@ export class Player {
   spend(cost) {
     if (this.vigor <= 0) return false;
     this.vigor = Math.max(0, this.vigor - cost);
-    this.vigorDelay = 0.65;
+    this.vigorDelay = 0.6;
     return true;
   }
 
   start(action) { this.action = action; this.t = 0; this.hitSet = new Set(); this.struck = false; }
 
   activeArcanum() { return this.arcana[this.activeSlot]; }
+  mastery(a) { return masteryLevel(this.prog.mastery[a] || 0); }
 
   isInvulnerable() {
     if (this.invuln > 0) return true;
     if (this.action === 'dodge') return this.t >= PLAYER.dodge.iframes[0] && this.t <= PLAYER.dodge.iframes[1];
-    if (this.action === 'ability' || this.action === 'finisher' || this.action === 'rest') return true;
+    if (this.action === 'ability' || this.action === 'rest') return true;
+    if (this.action === 'finisher') return this.t >= 0.25 && this.t <= 0.45; // só no golpe final
     return false;
   }
 
@@ -64,6 +72,7 @@ export class Player {
         this.perfectFlash = 0.3;
         sfx.perfect();
         w.fx.burst(this.cx(), this.cy(), 8, '#f6f2ea', 60, 0.4, 0, 1);
+        this.onPerfectDodge();
       }
       return 'dodged';
     }
@@ -75,7 +84,8 @@ export class Player {
       w.shake = Math.max(w.shake, 2);
       w.fx.spark(this.cx() + this.facing * 8, this.cy() - 2, this.facing, '#fff3c4', 14);
       w.flashScreen = 0.08;
-      this.t = PLAYER.parry.dur - 0.12; // recuperação curta após aparo bem-sucedido
+      this.t = PLAYER.parry.dur - 0.12;
+      w.addMastery(3, 'parry');
       return 'parried';
     }
     this.hp -= dmg;
@@ -99,12 +109,23 @@ export class Player {
     return 'hit';
   }
 
+  onPerfectDodge() {
+    const w = this.world;
+    w.addMastery(2, 'perfect');
+    if (this.arcana.includes('louco') && this.mastery('louco') >= 2) { this.empowered = 2; w.toast('Risco Calculado'); }
+    if (this.prog.equipped === 'ruptura') this.ashCharge = 3;
+  }
+
   update(dt) {
     const w = this.world;
     this.t += dt;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.flash > 0) this.flash -= dt;
     if (this.perfectFlash > 0) this.perfectFlash -= dt;
+    if (this.empowered > 0) this.empowered -= dt;
+    if (this.ashCharge > 0) this.ashCharge -= dt;
+    if (this.oil > 0) this.oil -= dt;
+    if (this.itemCd > 0) this.itemCd -= dt;
     if (this.dropThrough > 0) this.dropThrough = Math.max(0, this.dropThrough - dt);
     if (this.comboTimer > 0) this.comboTimer -= dt; else this.combo = 0;
     for (const k in this.cooldowns) this.cooldowns[k] = Math.max(0, this.cooldowns[k] - dt);
@@ -117,7 +138,6 @@ export class Player {
       return;
     }
 
-    // Recursos
     if (this.vigorDelay > 0) this.vigorDelay -= dt;
     else if (this.action !== 'dodge') this.vigor = Math.min(this.maxVigor, this.vigor + (this.action === 'parry' ? 20 : 48) * dt);
     if (!w.inCombat) this.foco = Math.min(this.maxFoco, this.foco + 2 * dt);
@@ -126,6 +146,7 @@ export class Player {
       this.hp = Math.min(this.maxHp, this.hp + a); this.healLeft -= a;
       if (Math.random() < 0.3) w.fx.parts.push({ x: this.x + Math.random() * this.w, y: this.y + this.h, vx: 0, vy: -30, life: 0.6, max: 0.6, color: '#9fe0a8', grav: 0, size: 1 });
     }
+    if (this.oil > 0 && Math.random() < 0.25) w.fx.parts.push({ x: this.cx() + this.facing * 8, y: this.y + 6 + Math.random() * 8, vx: 0, vy: -20, life: 0.3, max: 0.3, color: '#ffb070', grav: 0, size: 1 });
 
     const mx = (Input.down('right') ? 1 : 0) - (Input.down('left') ? 1 : 0);
     if (this.onGround) this.coyote = 0.1; else this.coyote -= dt;
@@ -133,19 +154,17 @@ export class Player {
     if (!this.action) this.freeControl(dt, mx);
     else this.updateAction(dt, mx);
 
-    if (!(this.action === 'ability')) this.vy = Math.min(this.vy + GRAVITY * dt, 560);
+    if (this.action !== 'ability') this.vy = Math.min(this.vy + GRAVITY * dt, 560);
     const vyBefore = this.vy;
     moveBody(this, w.level, dt);
     if (this.justLanded && vyBefore > 300) { sfx.land(); w.fx.burst(this.cx(), this.y + this.h, 5, '#625b58', 30, 0.3, 50); }
     if (this.onGround && Math.abs(this.vx) > 10) this.walkPhase += dt * Math.abs(this.vx) * 0.12;
 
-    // Queda em área fora do mapa
     if (this.y > w.level.g.length * TILE + 40) { this.hp = 0; this.takeHit(1, null, {}); }
   }
 
   freeControl(dt, mx) {
     const w = this.world;
-    // Correr: manter Shift pressionado depois da esquiva
     this.running = Input.down('dodge') && mx !== 0 && this.t > 0.05;
     const speed = this.running ? PLAYER.run : PLAYER.walk;
     const target = mx * speed;
@@ -170,30 +189,62 @@ export class Player {
     if (Input.pressed('heavy') && this.vigor > 0 && this.onGround) { Input.consume('heavy'); this.start('heavyCharge'); sfx.charge(); return; }
     if (Input.pressed('potion')) {
       Input.consume('potion');
-      if (this.potions > 0) { this.start('heal'); this.healUsed = false; } else w.toast('Sem frascos — descanse numa pira');
+      if (this.potions > 0) { this.start('heal'); this.healUsed = false; this.healStarted = false; } else w.toast('Sem frascos — descanse numa pira');
       return;
     }
     if (Input.pressed('spell')) {
       Input.consume('spell');
-      if (!w.flags.brasa) w.toast('Nenhum feitiço aprendido ainda');
+      if (!w.prog.flags.brasa) w.toast('Nenhum feitiço aprendido ainda');
       else if (this.foco < SPELLS.brasa.cost) w.toast('Foco insuficiente');
       else { this.foco -= SPELLS.brasa.cost; this.start('cast'); }
       return;
     }
-    if (Input.pressed('ability')) {
-      Input.consume('ability');
-      const a = this.activeArcanum();
-      if (!a) w.toast('Nenhum Arcano neste espaço');
-      else if (this.cooldowns[a] > 0) w.toast(`${ARCANA[a].ability.name}: recarga ${this.cooldowns[a].toFixed(1)} s`);
-      else { this.cooldowns[a] = ARCANA[a].ability.cd; this.start('ability'); sfx.dodge(); sfx.fire(); }
-      return;
-    }
+    if (Input.pressed('ability')) { Input.consume('ability'); return this.tryAbility(); }
     if (Input.pressed('swap')) {
       Input.consume('swap');
       this.activeSlot = 1 - this.activeSlot; this.start('swap'); sfx.ui();
       return;
     }
+    if (Input.pressed('item')) { Input.consume('item'); return this.useItem(); }
+    if (Input.pressed('cycle')) { Input.consume('cycle'); return this.cycleItem(); }
     if (Input.pressed('interact')) { Input.consume('interact'); w.interact(); }
+  }
+
+  tryAbility() {
+    const w = this.world;
+    const a = this.activeArcanum();
+    if (!a) return w.toast('Nenhum Arcano neste espaço');
+    const ab = ARCANA[a].abilities[0];
+    if (this.mastery(a) < ab.mastery) return w.toast(`${ab.name}: requer Maestria I`);
+    if (this.cooldowns[a] > 0) return w.toast(`${ab.name}: recarga ${this.cooldowns[a].toFixed(1)} s`);
+    if (this.foco < ab.foco) return w.toast('Foco insuficiente');
+    this.foco -= ab.foco;
+    this.cooldowns[a] = ab.cd * (this.mastery(a) >= 4 ? 0.95 : 1);
+    this.start('ability'); sfx.dodge(); sfx.fire();
+  }
+
+  cycleItem() {
+    const ids = Object.keys(ITEMS);
+    const i = ids.indexOf(this.prog.quick);
+    this.prog.quick = ids[(i + 1) % ids.length];
+    sfx.ui();
+    this.world.toast(`Item rápido: ${ITEMS[this.prog.quick].name} (${this.prog.items[this.prog.quick] || 0})`);
+  }
+
+  useItem() {
+    const w = this.world, id = this.prog.quick;
+    const n = this.prog.items[id] || 0;
+    if (n <= 0) return w.toast(`Sem ${ITEMS[id].name}`);
+    if (id === 'bomba') {
+      if (this.itemCd > 0) return w.toast(`Bomba: recarga ${this.itemCd.toFixed(0)} s`);
+      this.prog.items.bomba--; this.itemCd = 12;
+      this.start('throw');
+    } else if (id === 'oleo') {
+      this.prog.items.oleo--; this.oil = 45; sfx.fire(); w.toast('Óleo de Brasa: +8% de fogo por 45 s');
+    } else if (id === 'selo') {
+      if (w.arenaLocked) return w.toast('O selo não funciona na arena');
+      this.prog.items.selo--; w.returnToCheckpoint();
+    }
   }
 
   onOneWay() {
@@ -204,9 +255,10 @@ export class Player {
   }
 
   doDodge(mx) {
-    const now = this.world.time;
+    const w = this.world;
+    const now = w.time;
     let cost = PLAYER.dodge.cost;
-    if (this.relics.includes('cinza') && this.world.inCombat && now - this.lastDodge > 4) cost = Math.round(cost * 0.5);
+    if (this.relics.includes('cinza') && w.inCombat && now - this.lastDodge > 4) cost = Math.round(cost * 0.5);
     this.lastDodge = now;
     this.spend(cost);
     if (mx) this.facing = mx;
@@ -214,68 +266,93 @@ export class Player {
     this.perfectThisDodge = false;
     this.vx = this.facing * PLAYER.dodge.speed;
     sfx.dodge();
+    // Caminho Improvável: a esquiva deixa um eco que distrai inimigos
+    if (this.arcana.includes('louco') && this.mastery('louco') >= 3 && now - this.lastEcho >= 4) {
+      this.lastEcho = now;
+      w.spawnEcho(this.cx(), this.y + this.h, this.facing);
+    }
   }
 
   doLight() {
-    this.spend(PLAYER.light.cost);
-    this.combo = this.combo % 3;
+    const W = this.weapon();
+    this.spend(Math.max(4, PLAYER.light.cost + W.cost));
+    this.combo = this.combo % W.combo.length;
     this.start('light');
     this.comboIndex = this.combo;
     this.combo++;
     this.comboTimer = 0.6;
-    if (this.onGround) this.vx = this.facing * 45;
+    if (this.onGround) this.vx = this.facing * (W.thrust ? 60 : 45);
     sfx.swing();
   }
 
   attackBox(kind) {
-    const f = this.facing;
+    const f = this.facing, W = this.weapon();
     if (kind === 'heavy') {
-      const y = this.y - 8, h = this.h - 6 + 8 - 2; // não alcança alvos rentes ao chão
-      return { x: f > 0 ? this.x + this.w - 2 : this.x - 26, y, w: 28, h };
+      const reach = W.reach + 4;
+      return { x: f > 0 ? this.x + this.w - 2 : this.x - reach + 2, y: this.y - 8, w: reach, h: this.h };
     }
     if (kind === 'ability') return { x: this.x - 4, y: this.y, w: this.w + 8, h: this.h };
-    return { x: f > 0 ? this.x + this.w - 2 : this.x - 22, y: this.y + 1, w: 24, h: this.h };
+    if (W.thrust) return { x: f > 0 ? this.x + this.w - 2 : this.x - W.reach + 2, y: this.y + 5, w: W.reach, h: this.h - 4 };
+    const back = W.wide ? 6 : 0;
+    return { x: f > 0 ? this.x + this.w - 2 - back : this.x - W.reach + 2, y: this.y + 1, w: W.reach + back, h: this.h };
+  }
+
+  damageMul() {
+    let m = weaponDamageMul(this.prog, this.prog.equipped);
+    if (this.oil > 0) m *= 1.08;
+    if (this.empowered > 0) m *= 1.3;
+    return m;
   }
 
   strike(kind, dmg, posture) {
     const w = this.world;
     const box = this.attackBox(kind);
     let hitAny = false;
+    const mul = kind === 'ability' ? 1 : this.damageMul();
     for (const e of w.targets()) {
       if (!e.alive() || this.hitSet.has(e)) continue;
       if (overlap(box, e.hurtbox())) {
         this.hitSet.add(e);
-        const r = e.takeDamage(dmg, posture, this.facing, { kind, world: w });
+        const r = e.takeDamage(Math.round(dmg * mul), posture, this.facing, { kind, world: w, oil: this.oil > 0 });
         hitAny = true;
         if (r !== 'guarded') this.foco = Math.min(this.maxFoco, this.foco + 1);
+        if (kind === 'ability') w.addMastery(3, 'ability');
+        if (this.ashCharge > 0 && kind !== 'ability') {
+          this.ashCharge = 0;
+          w.fx.add(new AshPatch(e.cx(), e.y + e.h, 0.8, 26, 160, 'player'));
+        }
       }
     }
-    if (kind === 'heavy') w.breakTiles(box);
+    if (hitAny && this.empowered > 0 && kind !== 'ability') this.empowered = 0;
+    if (kind === 'heavy' || kind === 'light') w.breakTiles(box, kind);
     if (hitAny) { w.hitstop = Math.max(w.hitstop, kind === 'heavy' ? 0.07 : 0.035); }
     return hitAny;
   }
 
   updateAction(dt, mx) {
     const w = this.world;
-    const P = PLAYER;
+    const P = PLAYER, W = this.weapon();
     switch (this.action) {
       case 'light': {
+        const sp = W.speed;
+        const lt = this.t * sp;
         this.vx *= this.onGround ? 0.85 : 0.98;
-        if (this.t >= P.light.active[0] && this.t <= P.light.active[1]) this.strike('light', P.light.dmg[this.comboIndex], P.light.posture[this.comboIndex]);
-        if (this.t > 0.2 && Input.pressed('light') && this.vigor > 0 && this.comboIndex < 2) {
+        if (lt >= P.light.active[0] && lt <= P.light.active[1]) this.strike('light', W.combo[this.comboIndex], W.posture[this.comboIndex]);
+        if (lt > 0.2 && Input.pressed('light') && this.vigor > 0 && this.comboIndex < W.combo.length - 1) {
           Input.consume('light'); if (mx) this.facing = mx; this.doLight(); return;
         }
-        if (this.t > 0.22 && Input.pressed('dodge') && this.vigor > 0) { Input.consume('dodge'); this.action = null; this.doDodge(mx); return; }
-        if (this.t >= P.light.dur) this.action = null;
+        if (lt > 0.22 && Input.pressed('dodge') && this.vigor > 0) { Input.consume('dodge'); this.action = null; this.doDodge(mx); return; }
+        if (lt >= P.light.dur) this.action = null;
         break;
       }
       case 'heavyCharge': {
         this.vx *= 0.8;
         if (mx) this.facing = mx;
         const released = !Input.down('heavy');
-        if ((released && this.t >= P.heavy.minCharge) || this.t >= P.heavy.maxCharge) {
-          this.charged = this.t >= P.heavy.maxCharge - 0.01;
-          this.spend(P.heavy.cost);
+        const maxC = P.heavy.maxCharge / W.speed;
+        if ((released && this.t >= P.heavy.minCharge / W.speed) || this.t >= maxC) {
+          this.charged = this.t >= maxC - 0.01;
+          this.spend(this.charged ? P.heavy.costCharged : P.heavy.cost);
           this.start('heavy');
           this.vx = this.facing * 70;
           sfx.heavy();
@@ -286,10 +363,10 @@ export class Player {
       case 'heavy': {
         this.vx *= 0.85;
         if (this.t >= 0.06 && this.t <= 0.16) {
-          const hit = this.strike('heavy', this.charged ? P.heavy.dmgCharged : P.heavy.dmg, this.charged ? P.heavy.postureCharged : P.heavy.posture);
+          const hit = this.strike('heavy', this.charged ? W.heavy[1] : W.heavy[0], (this.charged ? 1.6 : 1) * W.posture[W.posture.length - 1] * 1.7);
           if (hit && !this.struck) { this.struck = true; w.shake = Math.max(w.shake, 3); }
         }
-        if (this.t >= 0.5) this.action = null;
+        if (this.t >= 0.5 / Math.max(0.8, W.speed)) this.action = null;
         break;
       }
       case 'dodge': {
@@ -312,12 +389,16 @@ export class Player {
       }
       case 'heal': {
         this.vx = mx * 30;
-        if (!this.healUsed && this.t >= 0.4) {
+        if (!this.healUsed && this.t >= 0.05) {
+          // o frasco é consumido ao iniciar a animação (Vol. V)
           this.healUsed = true; this.potions--;
+        }
+        if (!this.healStarted && this.t >= 0.4) {
+          this.healStarted = true;
           this.healLeft = this.maxHp * P.heal.pct; this.healRate = this.healLeft / P.heal.time;
           sfx.heal();
         }
-        if (this.t >= P.heal.anim) this.action = null;
+        if (this.t >= P.heal.anim) { this.action = null; this.healStarted = false; }
         break;
       }
       case 'cast': {
@@ -331,10 +412,24 @@ export class Player {
         if (this.t >= 0.42) this.action = null;
         break;
       }
+      case 'throw': {
+        this.vx *= 0.8;
+        if (!this.struck && this.t >= 0.16) {
+          this.struck = true;
+          w.fx.add(new Projectile({
+            owner: 'player', x: this.cx() + this.facing * 6, y: this.y + 4, vx: this.facing * 150, vy: -170, grav: 600, r: 3, dmg: 0, life: 2,
+            color: '#3a2f2a', glow: '#e17a3d',
+            onLand: (world, x, y) => world.explode(x, y, 34, 220, 'player'),
+            onHitEnemy: (world, x, y) => world.explode(x, y, 34, 220, 'player'),
+          }));
+          sfx.swing();
+        }
+        if (this.t >= 0.4) this.action = null;
+        break;
+      }
       case 'ability': {
-        // Salto de Cinzas — atravessa inimigos leves
         this.vx = this.facing * 380; this.vy = 0;
-        this.strike('ability', ARCANA.louco.ability.dmg, 25);
+        this.strike('ability', ARCANA.louco.abilities[0].dmg, 25);
         w.fx.parts.push({ x: this.cx(), y: this.y + 4 + Math.random() * 16, vx: 0, vy: -15, life: 0.5, max: 0.5, color: Math.random() < 0.5 ? '#d9b58a' : '#625b58', grav: 0, size: 2 });
         if (this.t >= 0.24) { this.action = null; this.vx = this.facing * 90; }
         break;
@@ -344,12 +439,17 @@ export class Player {
         if (this.t >= 0.22) this.action = null;
         break;
       }
+      case 'gather': {
+        this.vx = 0;
+        if (this.t >= 0.6) { this.action = null; if (this.gatherTarget) w.collectHerb(this.gatherTarget); this.gatherTarget = null; }
+        break;
+      }
       case 'finisher': {
         this.vx = 0;
         if (!this.struck && this.t >= 0.32 && this.finTarget) {
           this.struck = true;
           const e = this.finTarget;
-          e.takeDamage(e.isBoss ? PLAYER.finisher.bossDmg : PLAYER.finisher.dmg, 0, this.facing, { kind: 'finisher', world: w });
+          e.takeDamage(Math.round((e.isBoss ? PLAYER.finisher.bossDmg : PLAYER.finisher.dmg) * this.damageMul()), 0, this.facing, { kind: 'finisher', world: w });
           e.endBreak && e.endBreak();
           w.hitstop = 0.15; w.shake = 6; w.flashScreen = 0.1;
           w.fx.burst(e.cx(), e.cy(), 26, '#a72f2f', 120, 0.6);
@@ -368,9 +468,18 @@ export class Player {
   }
 
   startFinisher(e) {
+    this.spend(PLAYER.finisher.cost);
     this.start('finisher');
     this.finTarget = e;
     this.facing = Math.sign(e.cx() - this.cx()) || this.facing;
-    this.x = e.cx() - this.facing * (e.w / 2 + 10) - this.w / 2;
+    const nx = e.cx() - this.facing * (e.w / 2 + 10) - this.w / 2;
+    const lvl = this.world.level;
+    const tx = Math.floor((nx + (this.facing > 0 ? 0 : this.w)) / TILE);
+    if (!lvl.solid(tx, Math.floor((this.y + 4) / TILE)) && !lvl.solid(tx, Math.floor((this.y + this.h - 2) / TILE))) this.x = nx;
+  }
+
+  startGather(it) {
+    this.start('gather');
+    this.gatherTarget = it;
   }
 }
