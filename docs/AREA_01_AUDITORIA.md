@@ -32,6 +32,8 @@ A01 Despertar → A02 Cinzeiral → A03 Pátio dos Sinos → A04 Galeria → B05
 | Arena de 3,5 telas, porta de pedra, começo no círculo de cinza, sem mobs | CANON | IMPLEMENTADO (84 tiles; antes eram 2,3 telas) |
 | Magia elemental removida | CANON | IMPLEMENTADO (saiu Brasa Lançada) |
 | Três poções, recarga de 1,5 s, frascos divididos | CANON | IMPLEMENTADO (Q bebe, R troca, preparo na pira) |
+| Começa de mãos vazias; a primeira arma (Fio do Peregrino) está num baú inicial; cada arma tem desenho e combo próprios | CANON (baús iniciais) | IMPLEMENTADO |
+| Áudios do Pedro (21/11): combate rápido, parkour, sem nível, mundo livre e só os chefes trancados com chave | Pedido do autor | IMPLEMENTADO: a chave de Asgmor cai do Sino-Fendido do pátio (PROPOSTA) |
 | Relíquia do Louco: 18%, garantida na 6ª vitória | CANON | IMPLEMENTADO (antes era garantida) |
 | Ruptura: 35%, 15%, +10 p.p., teto de 75% | CANON | IMPLEMENTADO |
 | Cinco funções de mobs, só da região | CANON | IMPLEMENTADO (sprites ainda desenhados por código) |
@@ -49,11 +51,13 @@ A01 Despertar → A02 Cinzeiral → A03 Pátio dos Sinos → A04 Galeria → B05
 4. **Foco**: sem feitiços, só as habilidades de Arcano usam Foco.
 5. **O Louco com Maestria I na libertação** e o efeito da Ruptura continuam sendo propostas.
 6. **Dificuldade e duração**: falta teste com gente jogando.
-7. **Arte dos mobs e NPCs**: ainda sem referência; ficam menos detalhados que o Errante e o Asgmor.
+7. **Arte dos mobs e NPCs**: feita a partir das cores e formas do manual, sem imagem do Pedro. Ele aprova?
+8. **Regeneração de Vigor**: subiu de 48 para 70 por segundo, para o ritmo frenético pedido nos áudios. Os custos do Vol. V não mudaram.
+9. **Salto na parede e agarrar beiradas**: entram como parkour pedido nos áudios; nenhum caminho principal depende deles.
 
 Os manuais pedem diagnóstico e aprovação antes de alterar o projeto. O dono do repositório pediu para dar continuidade direto, então o diagnóstico vem junto com a entrega.
 
 ## Testes
 
 - `node tools/testar_mapa.mjs` (pasta do projeto): todo spawn no chão, toda sala alcançável com o pulo do jogo, setor D fechado até o mecanismo e volta possível de qualquer ponto testado.
-- `tools/teste_jogo.js` (no console): 27 verificações de deslize, alavancas, save, poções, travessias, kit do chefe, recompensas, morte e mobs.
+- `tools/teste_jogo.js` (no console): 39 verificações de deslize, alavancas, save, poções, travessias, kit do chefe, recompensas, morte e mobs.

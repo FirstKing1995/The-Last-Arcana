@@ -191,9 +191,10 @@ function buildRows(world, tab) {
         name: `${weaponName(prog, id)}<small>${W.cat} · ${W.rarity}</small>${eq ? ' <span class="tag">equipada</span>' : ''}`,
         desc: `${W.desc} Golpes: ${W.combo.length} · alcance ${W.reach} · ${W.speed > 1 ? 'rápida' : W.speed < 1 ? 'lenta' : 'equilibrada'}.`,
         btn: eq ? 'Equipada' : 'Equipar', disabled: eq,
-        act: () => { prog.equipped = id; sfx.chest(); },
+        act: () => { p.equip(id); },
       });
     }
+    if (!out.length) out.push({ name: 'Punhos', desc: 'O Errante ainda não tem arma. A primeira está num baú, perto de onde ele despertou.' });
     const missing = Object.keys(WEAPONS).filter((id) => prog.weapons[id] === undefined);
     if (missing.length) out.push({ name: `<small>${missing.length} arma(s) ainda não encontrada(s) no vale</small>`, desc: 'Armas regionais caem de inimigos (4% por fonte) ou estão em baús. Nenhuma é obrigatória.' });
   } else if (tab === 'reliquias') {

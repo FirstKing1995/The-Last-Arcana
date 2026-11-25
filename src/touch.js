@@ -49,6 +49,7 @@ const TOP = [
   ['ARC', ['ability'], 162],
   ['ITEM', ['item'], 212],
   ['MAPA', ['map'], 262],
+  ['ARMA', ['nextweapon'], 312],
 ];
 
 function makeButton(root, label, actions, cls, style) {

@@ -1,10 +1,47 @@
 import { overlap, TILE } from './physics.js';
 import { sfx } from './audio.js';
 import { r2 } from './hd.js';
+import { piece, has } from './art.js';
 
 // Partículas, números de dano, projéteis e perigos de cenário.
 export class FX {
-  constructor() { this.parts = []; this.nums = []; this.objs = []; }
+  constructor() { this.parts = []; this.nums = []; this.objs = []; this.vis = []; }
+
+  // ---------- efeitos visuais (não dão dano) ----------
+  dust(x, y, dir, n) {
+    for (let i = 0; i < n; i++) {
+      const d = dir || (Math.random() < 0.5 ? -1 : 1);
+      this.vis.push({ k: 'puff', x: x + (Math.random() - 0.5) * 8, y: y - Math.random() * 2, vx: d * (10 + Math.random() * 50), vy: -6 - Math.random() * 22, r: 1.5 + Math.random() * 3, t: 0, d: 0.28 + Math.random() * 0.3 });
+    }
+  }
+  ring(x, y, color, r) { this.vis.push({ k: 'ring', x, y, color, r, t: 0, d: 0.28 }); }
+  shockRing(x, y) { this.vis.push({ k: 'shock', x, y, t: 0, d: 0.3 }); }
+  charge(x, y, color) { const a = Math.random() * 6.28, r = 16 + Math.random() * 10; this.parts.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: -Math.cos(a) * r * 4, vy: -Math.sin(a) * r * 4, life: 0.22, max: 0.22, color, grav: 0, size: 1, glow: 1 }); }
+  // impacto de corte: risco de luz atravessando o alvo, estrela e fagulhas
+  slashHit(x, y, dir, k, color) {
+    const a = (Math.random() - 0.5) * 1.1 + (dir > 0 ? 0 : Math.PI);
+    this.vis.push({ k: 'cut', x, y, a, len: 22 * k, color, t: 0, d: 0.16 + 0.05 * k });
+    this.vis.push({ k: 'star', x, y, r: 7 * k, color, t: 0, d: 0.12 });
+    for (let i = 0; i < 6 + 5 * k; i++) { const q = a + (Math.random() - 0.5) * 1.2, s = 90 + Math.random() * 190 * k; this.parts.push({ x, y, vx: Math.cos(q) * s, vy: Math.sin(q) * s - 30, life: 0.28 + Math.random() * 0.2, max: 0.4, color: Math.random() < 0.5 ? color : '#ffb070', grav: 420, size: 1, streak: 1, glow: 1 }); }
+  }
+  drawVis(ctx, cam) {
+    for (const v of this.vis) {
+      const q = v.t / v.d, x = v.x - cam.x, y = v.y - cam.y;
+      if (v.k === 'puff') {
+        ctx.globalAlpha = 0.55 * (1 - q); ctx.fillStyle = q < 0.4 ? '#c8ccd4' : '#8a8f9a';
+        const r = v.r * (0.7 + q * 1.1); ctx.fillRect(r2(x - r), r2(y - r * 0.7), r2(r * 2), r2(r * 1.4)); ctx.fillRect(r2(x - r * 0.6), r2(y - r), r2(r * 1.2), r2(r * 2));
+        continue;
+      }
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - q; ctx.strokeStyle = ctx.fillStyle = v.color || '#ffe6c0';
+      if (v.k === 'ring') { ctx.lineWidth = 2.5 * (1 - q) + 0.5; ctx.beginPath(); ctx.arc(x, y, v.r * (0.25 + 0.75 * (1 - (1 - q) * (1 - q))), 0, 6.2832); ctx.stroke(); } else if (v.k === 'shock') { ctx.lineWidth = 3 * (1 - q) + 0.5; ctx.beginPath(); ctx.ellipse(x, y - 1, 12 + 56 * q, 3 + 7 * q, 0, 0, 6.2832); ctx.stroke(); } else if (v.k === 'cut') {
+        const l = v.len * (0.5 + q), w = 3.2 * (1 - q); ctx.save(); ctx.translate(x, y); ctx.rotate(v.a);
+        ctx.beginPath(); ctx.moveTo(-l, 0); ctx.lineTo(0, -w); ctx.lineTo(l, 0); ctx.lineTo(0, w); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(-l * 0.7, 0); ctx.lineTo(0, -w * 0.45); ctx.lineTo(l * 0.7, 0); ctx.lineTo(0, w * 0.45); ctx.fill(); ctx.restore();
+      } else if (v.k === 'star') { const r = v.r * (1 - q * 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(0.6); for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, -r * 0.2); ctx.lineTo(r, 0); ctx.lineTo(0, r * 0.2); ctx.fill(); } ctx.restore(); }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+  }
 
   burst(x, y, n, color, speed = 80, life = 0.5, grav = 200, size = 2) {
     for (let i = 0; i < n; i++) {
@@ -21,7 +58,7 @@ export class FX {
     }
   }
   number(x, y, val, color = '#f2e6d0') {
-    this.nums.push({ x, y, text: String(Math.round(val)), life: 0.8, color });
+    this.nums.push({ x: x + (Math.random() - 0.5) * 12, y, text: String(Math.round(val)), life: 0.8, color, vx: (Math.random() - 0.5) * 30, vy: -70, pop: 0 });
   }
   add(o) { this.objs.push(o); return o; }
 
@@ -30,7 +67,10 @@ export class FX {
       p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
     }
     this.parts = this.parts.filter((p) => p.life > 0);
-    for (const n of this.nums) { n.y -= 22 * dt; n.life -= dt; }
+    for (const n of this.nums) { n.vy = (n.vy === undefined ? -60 : n.vy) + 150 * dt; n.x += (n.vx || 0) * dt; n.y += n.vy * dt; n.life -= dt; n.pop = (n.pop || 0) + dt; }
+    for (const v of this.vis) { v.t += dt; if (v.vx !== undefined) { v.x += v.vx * dt; v.y += v.vy * dt; v.vx *= 0.94; v.vy *= 0.94; } }
+    this.vis = this.vis.filter((v) => v.t < v.d);
+    if (this.parts.length > 420) this.parts.splice(0, this.parts.length - 420);
     this.nums = this.nums.filter((n) => n.life > 0);
     for (const o of this.objs) o.update(dt, world);
     this.objs = this.objs.filter((o) => !o.dead);
@@ -43,9 +83,12 @@ export class FX {
     for (const p of this.parts) {
       ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
       ctx.fillStyle = p.color;
+      ctx.globalCompositeOperation = p.glow ? 'lighter' : 'source-over';
+      if (p.streak) { ctx.save(); ctx.translate(r2(p.x - cam.x), r2(p.y - cam.y)); ctx.rotate(Math.atan2(p.vy, p.vx)); ctx.fillRect(-Math.min(9, Math.hypot(p.vx, p.vy) * 0.035), -0.5, Math.min(9, Math.hypot(p.vx, p.vy) * 0.035), 1); ctx.restore(); continue; }
       ctx.fillRect(r2(p.x - cam.x), r2(p.y - cam.y), p.size, p.size);
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    this.drawVis(ctx, cam);
     ctx.font = '8px Silkscreen, monospace';
     ctx.textAlign = 'center';
     for (const n of this.nums) {
@@ -100,6 +143,7 @@ export class Projectile {
   }
   draw(ctx, cam) {
     const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
+    if (this.icon && has(this.icon)) { piece(ctx, this.icon, x, y + 6, { scale: 0.8, rot: this.x * 0.06 }); return; }
     ctx.fillStyle = this.glow;
     ctx.globalAlpha = 0.35;
     ctx.fillRect(x - this.r - 1, y - this.r - 1, this.r * 2 + 2, this.r * 2 + 2);

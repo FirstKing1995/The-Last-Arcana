@@ -24,7 +24,7 @@ export class Asgmor extends Mob {
   alive() { return !this.dead && this.state !== 'dormant'; }
   flinches() { return false; }
   edgeAhead() { return false; }
-  speedMul() { return this.phase === 2 ? 1.2 : 1; }
+  speedMul() { return 1; }
 
   activate() { if (this.state === 'dormant') { this.set('intro'); sfx.crackedBell(); } }
 
@@ -102,7 +102,7 @@ export class Asgmor extends Mob {
       case 'recover': {
         this.vx *= 0.8;
         this.facing = Math.sign(this.dx) || this.facing;
-        const wait = s === 'recover' ? 0.9 : 0.35;
+        const wait = s === 'recover' ? (this.phase === 2 ? 0.5 : 0.7) : 0.22;
         if (this.t > wait) {
           const n = this.pick();
           if (n === 'leap') {

@@ -19,7 +19,7 @@ export class Mob {
     this.hp = this.def.hp; this.posture = 0; this.postureCd = 0;
     this.state = 'idle'; this.t = 0; this.dead = false; this.deathT = 0;
     this.facing = -1; this.aggro = false; this.flash = 0; this.burn = 0; this.burnTick = 0;
-    this.hitDone = false; this.guarding = false; this.patrolI = 0; this.patrolWait = 0; this.alerted = false;
+    this.hitT = 0; this.hitDir = 1; this.hitDone = false; this.guarding = false; this.patrolI = 0; this.patrolWait = 0; this.alerted = false;
   }
   alive() { return !this.dead; }
   cx() { return this.x + this.w / 2; }
@@ -45,10 +45,10 @@ export class Mob {
     this.hp -= dmg;
     this.posture += posture;
     this.postureCd = 2;
-    this.flash = 0.1;
+    this.flash = 0.09; this.hitT = 0.16; this.hitDir = dir || 1;
     this.aggro = true;
-    if (result !== 'guarded') { if (info.kind === 'heavy' || info.kind === 'finisher') sfx.hitHeavy(); else sfx.hit(); w.fx.burst(this.cx(), this.cy(), 6, this.bloodColor || '#e17a3d', 60, 0.35); }
-    w.fx.number(this.cx(), this.y - 3, dmg, result === 'guarded' ? '#9aa0aa' : '#f2e6d0');
+    if (result !== 'guarded') { if (info.kind === 'heavy' || info.kind === 'finisher') sfx.hitHeavy(); else sfx.hit(); if (Math.random() < 0.5) sfx.mobHurt(); w.fx.burst(this.cx(), this.cy(), 6, this.bloodColor || '#e17a3d', 60, 0.35); }
+    w.fx.number(this.cx(), this.y - 3, dmg, result === 'guarded' ? '#9aa0aa' : info.crit ? '#ffd23a' : '#f2e6d0');
     if (this.hp <= 0) { this.die(); return 'kill'; }
     if (this.posture >= this.def.posture && this.state !== 'broken') {
       this.set('broken'); this.vx = dir * 60; sfx.guard();
@@ -60,8 +60,10 @@ export class Mob {
   }
 
   die() {
-    this.dead = true; this.deathT = 0; this.state = 'dead';
-    this.world.fx.burst(this.cx(), this.cy(), 18, '#625b58', 70, 0.8, 60, 2);
+    this.dead = true; this.deathT = 0; this.state = 'dead'; sfx.mobDie();
+    this.world.hitstop = Math.max(this.world.hitstop, 0.07);
+    this.world.fx.ring(this.cx(), this.cy(), '#ffb070', 26);
+    this.world.fx.burst(this.cx(), this.cy(), 26, '#8a827b', 120, 0.9, 120, 2);
     this.world.fx.burst(this.cx(), this.cy(), 10, this.bloodColor || '#e17a3d', 90, 0.5);
     this.world.onMobKilled(this);
   }
@@ -91,6 +93,7 @@ export class Mob {
     const w = this.world, p = w.player;
     this.t += dt;
     if (this.flash > 0) this.flash -= dt;
+    if (this.hitT > 0) this.hitT -= dt;
     if (this.postureCd > 0) this.postureCd -= dt; else this.posture = Math.max(0, this.posture - this.def.posture * 0.25 * dt);
     if (this.burn > 0) {
       this.burn -= dt; this.burnTick -= dt;
@@ -159,7 +162,7 @@ export class Mob {
 
   update(dt) {
     if (this.dead) { this.deathT += dt; return; }
-    if (this.common(dt)) this.think(dt);
+    if (this.common(dt * 1.18)) this.think(dt * 1.18);
     this.physics(dt);
   }
 }
@@ -174,14 +177,14 @@ export class Cinzeiro extends Mob {
     if (s === 'idle' || s === 'recover') {
       if (s === 'recover' && this.t < 0.4) { this.vx *= 0.85; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 46) { this.set('windup'); this.vx = 0; }
+      if (this.dist < 38) { this.set('windup'); this.vx = 0; }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
-      if (this.t > 0.5) { this.set('strike'); this.vx = this.facing * 170; sfx.swing(); }
+      if (this.t > 0.5) { this.set('strike'); this.vx = this.facing * 250; sfx.swing(); }
     } else if (s === 'strike') {
       this.vx *= 0.9;
-      this.melee(this.front(14), D.dmg, { parryable: true });
+      this.melee(this.front(16), D.dmg, { parryable: true });
       if (this.t > 0.18) this.set('retreat');
     } else if (s === 'retreat') {
       this.vx = -this.facing * 55;
@@ -203,24 +206,24 @@ export class Braseiro extends Mob {
       if (s === 'recover' && this.t < 0.7) { this.vx *= 0.85; return; }
       this.facing = Math.sign(this.dx) || this.facing;
       const r = Math.random();
-      if (this.dist < 34) {
+      if (this.dist < 46) {
         this.vx = 0;
         if (r < 0.55) this.set('slashWind'); else if (r < 0.75) this.set('guard'); else this.set('lungeWind');
       } else if (this.dist < 110 && r < 0.012) { this.vx = 0; this.set('lungeWind'); }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'slashWind') {
       this.vx = 0;
-      if (this.t > 0.45) { this.set('slash'); this.vx = this.facing * 60; sfx.swing(); }
+      if (this.t > 0.45) { this.set('slash'); this.vx = this.facing * 110; sfx.swing(); }
     } else if (s === 'slash') {
       this.vx *= 0.85;
-      this.melee(this.front(30, this.h - 4, 2), D.dmg, { parryable: true });
+      this.melee(this.front(36, this.h - 4, 2), D.dmg, { parryable: true });
       if (this.t > 0.16) this.set('recover');
     } else if (s === 'lungeWind') {
       this.vx = 0;
       if (this.t > 0.7) { this.set('lunge'); sfx.heavy(); }
     } else if (s === 'lunge') {
-      this.vx = this.facing * 230;
-      this.melee(this.front(18, this.h - 4, 2), D.dmg + 20, { parryable: true, knock: 1.4 });
+      this.vx = this.facing * 290;
+      this.melee(this.front(30, this.h - 4, 2), D.dmg + 20, { parryable: true, knock: 1.4 });
       if (this.t > 0.3 || this.hitWall) { this.set('recover'); this.t = -0.3; }
     } else if (s === 'guard') {
       this.vx = 0;
@@ -244,7 +247,7 @@ export class Rasteja extends Mob {
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
-      if (this.t > 0.35) { this.set('bite'); this.vx = this.facing * 210; sfx.swing(); }
+      if (this.t > 0.35) { this.set('bite'); this.vx = this.facing * 280; this.vy = -90; sfx.swing(); }
     } else if (s === 'bite') {
       this.vx *= 0.93;
       this.melee(this.front(12, 11, -1), D.dmg, { parryable: true });

@@ -47,7 +47,7 @@ export class World {
     this.time = 0;
     this.mobs = []; this.interactables = []; this.summons = []; this.loot = []; this.fauna = []; this.breakables = [];
     this.toasts = []; this.dialog = null; this.banner = null; this.menu = null;
-    this.shake = 0; this.hitstop = 0; this.flashScreen = 0;
+    this.slow = 0; this.hurtFlash = 0; this.shake = 0; this.hitstop = 0; this.flashScreen = 0;
     this.inCombat = false; this.bossFight = false; this.arenaLocked = false;
     this.ashUp = !!prog.flags.bossDefeated; this.echo = null;
     for (const s of this.level.spawns) {
@@ -63,6 +63,7 @@ export class World {
     if (prog.flags.wallBroken) this.level.replaceAll('X', '.');
     if (lv.portao) this.level.replaceAll('H', '.');
     if (lv.mec1 && lv.mec2) this.level.replaceAll('M', '.');
+    if (prog.flags.chave) this.level.replaceAll('K', '.');
     if (prog.flags.shortcut) this.level.openShortcut();
     for (const m of this.mobs) if (m.type === 'sinoElite' && prog.flags.cryptSilenced) { m.dead = true; m.deathT = 99; m.unique = true; }
     if (prog.flags.bossDefeated) { this.boss.dead = true; this.boss.deathT = 99; }
@@ -113,10 +114,12 @@ export class World {
     if (p.hp < p.maxHp * 0.5) this.tip('cura', `Beba uma poção (${k('Q', 'POÇÃO')}). ${k('R', 'TIPO')} troca entre Cura, Defesa e Dano.`);
     if (this.finisherTarget()) this.tip('final', `Postura quebrada! Chegue perto e aperte ${k('E', 'E')} para finalizar.`);
     const id = this.room && this.room.id, tx = p.cx() / TILE;
-    if (id === 'A01') this.tip('andar', Input.touchMode ? 'Arraste o lado esquerdo da tela para andar.' : 'A/D para andar, Espaço para pular, Shift esquiva (segure para correr).', 6);
+    if (id === 'A01') this.tip('andar', Input.touchMode ? 'Arraste o lado esquerdo da tela para andar.' : 'A/D anda, Espaço pula, Shift rola. Correndo, S desliza.', 6);
+    if (id === 'A01' && tx > 19) this.tip('bau', `Abra o baú com ${k('E', 'E')}: há uma arma dentro.`, 5);
+    if (this.prog.equipped && id === 'A01') this.tip('atacar', Input.touchMode ? 'ATACAR golpeia, PESADO carrega, APARAR defende.' : 'J ou clique: atacar. K ou botão direito: pesado. L: aparar. T: trocar de arma.', 8);
     if (id === 'B05' && tx > 178) this.tip('poco', `Tábuas sobre um poço: ${k('S + Espaço', '↓ + PULAR')} desce por elas.`, 6);
     if (id === 'B05' && tx > 157 && tx < 165) this.tip('cripta', 'Um arco antigo marca a Cripta do Campanário. É opcional.', 5);
-    if (id === 'B09' && tx < 136 && tx > 128) this.tip('deslize', `Há um vão sob a pedra. ${k('Shift', 'ESQUIVA')} desliza por passagens baixas.`, 6);
+    if (id === 'B09' && tx < 136 && tx > 128) this.tip('deslize', `Há um vão sob a pedra. Corra e segure ${k('S', '↓')} para deslizar por baixo.`, 6);
     if (id === 'C12') this.tip('mecanismo', 'A comporta responde a dois sinos. Encontre e puxe as duas alavancas.', 6);
     if (id === 'X1' && tx < 160) this.tip('sinos', 'Sinos sem badalo são falsos: tocam se você passar por baixo. Quebre-os ou passe esquivando.', 6);
     if (id === 'X2') this.tip('vento', 'Cinza soprada em ciclos: avance na calmaria e abrigue-se atrás dos pilares.', 6);
@@ -181,6 +184,13 @@ export class World {
     if (!d) return;
     this.addCoins(d.coins || 0, m.cx(), m.y - 6);
     this.addMastery(4, 'kill');
+    // A chave do chefe: o Sino-Fendido do pátio guarda o badalo que abre a porta (PROPOSTA, pedido do Pedro)
+    if (m.type === 'sino' && !m.summoned && !this.flags.chave) {
+      this.flags.chave = true; this.level.replaceAll('K', '.');
+      sfx.victory();
+      this.banner = { text: 'BADALO DO CAMPANÁRIO', sub: 'A porta de Asgmor se abriu', t: 0, dur: 3.2, small: true };
+      this.save();
+    }
     if (m.type === 'sinoElite') {
       this.flags.cryptSilenced = true; m.unique = true;
       sfx.victory();
@@ -209,7 +219,9 @@ export class World {
       if (overlap(box, { x: b.x - 6, y: b.y - 14, w: 14, h: 14 })) {
         b.broken = true;
         sfx.breakWall();
-        this.fx.burst(b.x, b.y - 6, 14, b.type === 'pot' ? '#6d4b32' : '#5a4030', 80, 0.6, 300, 2);
+        this.hitstop = Math.max(this.hitstop, 0.03);
+        this.fx.burst(b.x, b.y - 8, 22, b.type === 'pot' ? '#b06a44' : '#7a5a42', 130, 0.7, 420, 2);
+        this.fx.dust(b.x, b.y - 4, 0, 5);
         const r = Math.random();
         if (r < 0.7) this.addCoins(2 + Math.floor(Math.random() * 6), b.x, b.y - 10);
         else if (r < 0.85) { this.prog.herbs.liquen = (this.prog.herbs.liquen || 0) + 1; this.toast('+1 Líquen de Brasa'); }
@@ -259,7 +271,7 @@ export class World {
       if (it.type === 'herb' && it.state !== 0) continue;
       if (it.type === 'falsebell' || it.type === 'vent') continue;
       if (it.type === 'lever' && this.leverOn(it.id)) continue;
-      if (it.type === 'sign' && (it.id === 'portao' ? this.leverOn('portao') : this.leverOn('mec1') && this.leverOn('mec2'))) continue;
+      if (it.type === 'sign' && (it.id === 'chefe' ? this.flags.chave : it.id === 'portao' ? this.leverOn('portao') : this.leverOn('mec1') && this.leverOn('mec2'))) continue;
       if ((it.type === 'bigbell' || it.type === 'portal') && (!this.flags.bossDefeated || this.arenaLocked)) continue;
       const d = Math.abs(it.x - p.cx());
       if (d < 22 && Math.abs(it.y - (p.y + p.h)) < 20 && d < bd) { best = it; bd = d; }
@@ -298,6 +310,7 @@ export class World {
       case 'herb': p.startGather(it); return;
       case 'lever': return this.pullLever(it);
       case 'sign':
+        if (it.id === 'chefe') return this.dialogQueue([['Porta de Asgmor', 'A fechadura tem a forma de um badalo. Algo no pátio lá embaixo ainda toca: o Sino-Fendido.']]);
         return this.dialogQueue([it.id === 'portao'
           ? ['Portão', 'Barras de ferro fundido. A tranca fica do outro lado: só abre por dentro.']
           : ['Comporta', 'Duas correntes sobem até sinos presos na parede. As duas precisam se mover.']]);
@@ -369,7 +382,7 @@ export class World {
     }
     if (it.reward === 'weapon') {
       const r = grantWeapon(this.prog, it.weapon);
-      lines.push(['Baú', r === 'new' ? `Arma obtida: ${WEAPONS[it.weapon].name} (${WEAPONS[it.weapon].cat}). ${WEAPONS[it.weapon].desc} Equipe pelo inventário [I].` : `${WEAPONS[it.weapon].name} repetida: virou 1 Fragmento de Memória.`]);
+      lines.push(['Baú', r === 'new' ? `Arma obtida: ${WEAPONS[it.weapon].name} (${WEAPONS[it.weapon].cat}). ${WEAPONS[it.weapon].desc} Já está na sua mão. ${k('T', 'ARMA')} troca entre as armas.` : `${WEAPONS[it.weapon].name} repetida: virou 1 Fragmento de Memória.`]);
     }
     const coins = it.reward === 'coins' ? it.amount : it.coins;
     if (coins) { this.addCoins(coins, it.x, it.y - 14); lines.push(['Baú', `${coins} moedas.`]); }
@@ -384,7 +397,7 @@ export class World {
       L[it.id] = true;
       if (it.id === 'portao') { this.level.replaceAll('H', '.'); this.toast('Atalho permanente: o portão das ruínas abriu', 4); } else if (L.mec1 && L.mec2) { this.level.replaceAll('M', '.'); this.toast('Os dois sinos respondem. A comporta abriu', 4); } else { sfx.bell(220, 0.1); this.toast('Um sino respondeu. Falta o outro', 4); }
     }
-    sfx.breakWall(); sfx.chest();
+    sfx.breakWall(); sfx.chain(); sfx.chest();
     this.shake = 4;
     this.save();
   }
@@ -571,6 +584,7 @@ export class World {
     this.time += dt;
     this.prog.playTime = (this.prog.playTime || 0) + dt;
     if (this.flashScreen > 0) this.flashScreen -= dt;
+    if (this.hurtFlash > 0) this.hurtFlash -= dt;
     for (const t of this.toasts) t.t += dt;
     this.toasts = this.toasts.filter((t) => t.t < t.dur);
     if (this.banner) {
@@ -579,6 +593,8 @@ export class World {
     }
     if (this.hitstop > 0) { this.hitstop -= dt; this.updateCamera(dt); return; }
 
+    // câmera lenta curta em aparo, esquiva perfeita e finalização
+    if (this.slow > 0) { this.slow -= dt; dt *= 0.35; }
     const p = this.player;
     p.update(dt);
     // só atualiza inimigos perto da câmera (otimização)
@@ -627,7 +643,8 @@ export class World {
 
   updateCamera(dt, snap = false) {
     const p = this.player;
-    let tx = p.cx() - VW / 2 + p.facing * 24;
+    this.look = (this.look || 0) + ((p.facing * 26 + p.vx * 0.16) - (this.look || 0)) * Math.min(1, dt * 2.4);
+    let tx = p.cx() - VW / 2 + this.look;
     let ty = p.y + p.h - VH * (this.inCave ? 0.68 : 0.74);
     const maxX = this.level.g[0].length * TILE - VW, maxY = this.level.g.length * TILE - VH;
     if (this.arenaLocked) {
@@ -635,9 +652,10 @@ export class World {
       tx = Math.max(a.x0 - 8, Math.min(a.x1 - VW + 8, tx));
     }
     tx = Math.max(0, Math.min(maxX, tx)); ty = Math.max(0, Math.min(maxY, ty));
-    const k = snap ? 1 : 1 - Math.pow(0.002, dt);
+    if (Input.down('up') && p.onGround && Math.abs(p.vx) < 5 && !p.action) ty -= 30;
+    const k = snap ? 1 : 1 - Math.pow(0.0006, dt);
     this.cam.x += (tx - this.cam.x) * k;
     this.cam.y += (ty - this.cam.y) * k;
-    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 20);
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 22);
   }
 }

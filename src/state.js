@@ -7,8 +7,8 @@ const OLD = 'the-last-arcana.save.v1'; // mapa antigo: aproveita o progresso, me
 export function newProgress() {
   return {
     coins: 0,
-    weapons: { fio: 0 },        // arma -> nível de aprimoramento (+0..+5)
-    equipped: 'fio',
+    weapons: {},                // arma -> nível de aprimoramento (+0..+5); começa de mãos vazias
+    equipped: null,
     relicsOwned: [],
     relicSlots: [null, null],
     items: { bomba: 1, oleo: 0, selo: 1 },
@@ -23,7 +23,7 @@ export function newProgress() {
     potion: 'cura',
     relicTries: 0,
     rooms: {},                  // salas já visitadas (mapa)
-    flags: { levers: {}, bossDefeated: false, metElion: false, chests: {}, cryptSilenced: false, shortcut: false, metMorren: false, metYsara: false, bossWins: 0 },
+    flags: { levers: {}, chave: false, bossDefeated: false, metElion: false, chests: {}, cryptSilenced: false, shortcut: false, metMorren: false, metYsara: false, bossWins: 0 },
     herbRests: {},              // plantas raras: descansos desde a coleta
     checkpoint: null,
     playTime: 0,
@@ -66,6 +66,7 @@ export function grantWeapon(prog, id) {
     return 'duplicate';
   }
   prog.weapons[id] = 0;
+  prog.equipped = id; // a arma nova vai direto para a mão; T (ou a roda do mouse) troca
   return 'new';
 }
 

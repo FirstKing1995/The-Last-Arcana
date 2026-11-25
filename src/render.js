@@ -3,9 +3,9 @@
 import { TILE } from './physics.js';
 import { VW, VH } from './world.js';
 import { drawMob, drawNPC, drawMorren, drawYsara, drawFauna, drawEcho, brokenMark } from './sprites.js';
-import { drawErrante, drawAsgmor } from './art.js';
-import { backdrop, ashFall, drawTiles, hash } from './scene.js';
-import { r2, cached, blit, canvas } from './hd.js';
+import { drawErrante, drawAsgmor, piece, has, size, img } from './art.js';
+import { backdrop, ashFall, drawTiles, hash, shaft, fog } from './scene.js';
+import { r2, cached, blit, canvas, S } from './hd.js';
 import { ARCANA, ITEMS, HERBS, POTIONS, POTION_IDS } from './data.js';
 import { Input } from './input.js';
 
@@ -36,13 +36,36 @@ function light(ctx, x, y, r, color, a = 1) {
 // Quantos quadros cada adereço animado tem e de quanto em quanto tempo muda
 const ANIM = { bellpost: [8, 2 * Math.PI / 1.6 / 8], torch: [2, Math.PI / 14], forge: [2, Math.PI / 10], bigbell: [8, 2 * Math.PI / 0.8 / 8], chain: [6, 0.5], gearbell: [6, 0.5] };
 const BOX = { bigbell: [240, 230, 120, 224] };
+const PIECE = { column: (p) => (p.broken ? 'colunaq' : 'coluna'), fallenbell: () => 'sinocaido', bellpost: () => 'poste', torch: () => 'tocha', coffin: () => 'caixao', deadtree: () => 'arvore', bigbell: () => 'sinao' };
+const HANG = { gaiola: 1, estandarte: 1, sinao: 1, lanterna: 1 };
 function drawProp(ctx, pr, cam, time) {
   const x = pr.x - cam.x, y = pr.y - cam.y;
-  if (x < -130 || x > VW + 130 || y < -40 || y > VH + 220) return;
+  if (x < -130 || x > VW + 130 || y < -60 || y > VH + 220) return;
+  const nm = PIECE[pr.type] ? PIECE[pr.type](pr) : pr.type;
+  if (has(nm)) {
+    const o = { flip: pr.flip || (pr.v === 1 && nm !== 'casa2'), scale: pr.scale || 1 };
+    if (pr.type === 'column' && pr.tall) { piece(ctx, 'coluna', x, y, { ...o, sy: 1.9, sx: 1.15 }); return; }
+    if (pr.type === 'bigbell') { const sw = Math.sin(time * 0.8) * 0.05; ctx.fillStyle = '#17181d'; ctx.fillRect(r2(x) - 1, y - 260, 2, 150); piece(ctx, 'sinao', x, y - 62, { scale: 1.5, rot: sw }); return; }
+    if (HANG[nm]) { const h = size(nm)[1]; ctx.save(); ctx.translate(r2(x), r2(y - h)); ctx.rotate(Math.sin(time * 0.9 + pr.x) * (nm === 'estandarte' ? 0.015 : 0.035)); piece(ctx, nm, 0, h, o); ctx.restore(); return; }
+    if (nm === 'tocha') { piece(ctx, nm, x, y + 8, { sy: 1 + Math.sin(time * 17 + pr.x) * 0.03 }); flame(ctx, x, y - 12, time + pr.x, 0.7); return; }
+    if (nm === 'arvore') { piece(ctx, nm, x, y + 2, { ...o, rot: Math.sin(time * 0.7 + pr.x) * 0.008 }); return; }
+    piece(ctx, nm, x, y + (nm.startsWith('casa') || nm === 'forjaria' ? 2 : 1), o);
+    return;
+  }
   const [n, step] = ANIM[pr.type] || [1, 1];
   const i = Math.floor(time / step + pr.x) % n;
   const [w, h, ox, oy] = BOX[pr.type] || [130, 150, 64, 140];
   blit(ctx, cached(`prop:${pr.type}:${pr.v || 0}${pr.broken ? 'b' : ''}${pr.tall ? 't' : ''}:${i}`, w, h, (c) => rawProp(c, { ...pr, x: 0 }, ox, oy, i * step + 0.01)), x, y, ox, oy);
+}
+// Chama viva em camadas
+export function flame(ctx, x, y, t, k = 1) {
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 3; i++) {
+    const w = (6 - i * 1.7) * k, h = (14 - i * 3.5) * k * (0.85 + 0.15 * Math.sin(t * (13 + i * 4) + i)), sx = Math.sin(t * 9 + i * 2) * 1.2 * k;
+    ctx.fillStyle = ['rgba(200,70,30,0.55)', 'rgba(255,150,60,0.7)', 'rgba(255,235,180,0.9)'][i];
+    ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.quadraticCurveTo(x - w * 0.6, y - h * 0.5, x + sx, y - h); ctx.quadraticCurveTo(x + w * 0.6, y - h * 0.5, x + w / 2, y); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
 }
 function rawProp(ctx, pr, sx, sy, time) {
   const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(sx + x, sy + y, w, h); };
@@ -206,6 +229,19 @@ function drawInteractable(ctx, it, world, cam, time) {
   if (it.type === 'elion') return drawNPC(ctx, x, y, time);
   if (it.type === 'morren') return drawMorren(ctx, x, y, time);
   if (it.type === 'ysara') return drawYsara(ctx, x, y, time, true);
+  if (it.type === 'chest') { const op = !!world.flags.chests[it.id]; return piece(ctx, op ? 'bauaberto' : 'bau', x, y + 1, { scale: 0.86, sy: op ? 1 : 1 + Math.max(0, Math.sin(time * 2 + it.x)) * 0.015 }); }
+  if (it.type === 'lever') return piece(ctx, 'alavanca', x, y + 1, { flip: world.leverOn(it.id), scale: 0.9 });
+  if (it.type === 'stone') return piece(ctx, 'pedra', x, y + 1, { scale: 0.9 });
+  if (it.type === 'herb') {
+    if (it.state !== 0) return;
+    return piece(ctx, 'i_' + it.herb, x, y + 1 + Math.sin(time * 2 + it.x) * 0.4, { scale: 0.85 });
+  }
+  if (it.type === 'shrine') {
+    if (Math.random() < 0.35) world.fx.parts.push({ x: it.x + (Math.random() - 0.5) * 14, y: it.y - 20, vx: (Math.random() - 0.5) * 10, vy: -26 - Math.random() * 20, life: 1.2, max: 1.2, color: Math.random() < 0.5 ? '#ffb070' : '#ff8040', grav: -6, size: 1, glow: 1 });
+    piece(ctx, 'pira', x, y + 1);
+    for (let i = -1; i <= 1; i++) flame(ctx, x + i * 6, y - 17, time + i * 1.3 + it.x, 1.15 - Math.abs(i) * 0.35);
+    return;
+  }
   if (it.type === 'portal') return rawInteractable(ctx, it, world, r2(x), r2(y), time);
   if (it.type === 'shrine' && Math.random() < 0.25) world.fx.parts.push({ x: it.x + (Math.random() - 0.5) * 8, y: it.y - 22, vx: (Math.random() - 0.5) * 8, vy: -26, life: 1, max: 1, color: Math.random() < 0.5 ? '#ffb070' : '#e17a3d', grav: 0, size: 1 });
   const on = it.type === 'lever' ? world.leverOn(it.id) : it.type === 'chest' ? !!world.flags.chests[it.id] : it.type === 'vent' ? it.phase : it.state;
@@ -280,33 +316,41 @@ function rawInteractable(ctx, it, world, sx, sy, time, on) {
   }
 }
 
+let lmC = null, lmX = null;
+const LK = 4; // o mapa de luz tem 1/4 do tamanho e é ampliado com suavidade
 function lights(ctx, world, cam, time) {
-  ctx.globalCompositeOperation = 'lighter';
-  const L = (x, y, r, col, a) => { const sx = x - cam.x, sy = y - cam.y; if (sx > -r && sx < VW + r && sy > -r && sy < VH + r) light(ctx, sx, sy, r, col, a); };
+  const list = [];
+  const L = (x, y, r, col, a, soft) => { const sx = x - cam.x, sy = y - cam.y; if (sx > -r * 2.6 && sx < VW + r * 2.6 && sy > -r * 2.6 && sy < VH + r * 2.6) list.push([sx, sy, r, col, a, soft]); };
   for (const it of world.interactables) {
-    if (it.type === 'shrine') L(it.x, it.y - 16, 56, '#b65a2b', 0.55 + Math.sin(time * 9) * 0.06);
+    if (it.type === 'shrine') L(it.x, it.y - 18, 64, '#e0783a', 0.75 + Math.sin(time * 9) * 0.06);
     if (it.type === 'elion') L(it.x + 7, it.y - 24, 14, '#5aa6a0', 0.5);
     if (it.type === 'chest' && !world.flags.chests[it.id]) L(it.x, it.y - 6, 18, '#b0893a', 0.35);
-    if (it.type === 'stone') L(it.x, it.y - 12, 16, '#b65a2b', 0.3);
+    if (it.type === 'stone') L(it.x, it.y - 18, 22, '#e07a3a', 0.4);
     if (it.type === 'morren') L(it.x - 11, it.y - 8, 16, '#b0893a', 0.5);
     if (it.type === 'portal' && world.flags.bossDefeated && !world.arenaLocked) L(it.x, it.y - 16, 30, '#a08a6a', 0.5);
     if (it.type === 'herb' && it.state === 0) L(it.x, it.y - 5, 8, '#7a7a5a', 0.3);
   }
   for (const pr of world.level.props) {
-    if (pr.type === 'torch') L(pr.x, pr.y - 6, 40, '#b65a2b', 0.5 + Math.sin(time * 9 + pr.x) * 0.05);
+    if (pr.type === 'torch') L(pr.x, pr.y - 16, 52, '#f08a44', 0.7 + Math.sin(time * 9 + pr.x) * 0.06);
+    if (pr.type === 'janela') { L(pr.x, pr.y - 40, 46, '#ffd68c', 0.6); L(pr.x + 60, pr.y + 20, 56, '#c8a468', 0.35); }
+    if (pr.type.startsWith('casa')) { L(pr.x + (pr.flip ? -14 : 14), pr.y - 22, 30, '#f09a50', 0.6); if (pr.type === 'casa2') L(pr.x - 14, pr.y - 60, 26, '#f09a50', 0.5); }
+    if (pr.type === 'forjaria') L(pr.x + 24, pr.y - 16, 46, '#ff8a40', 0.75 + Math.sin(time * 11) * 0.08);
+    if (pr.type === 'fallenbell') L(pr.x, pr.y - 14, 16, '#e07a3a', 0.3);
+    if (pr.type === 'estandarte') L(pr.x, pr.y - 34, 14, '#ff4a5a', 0.35);
     if (pr.type === 'forge') L(pr.x, pr.y - 8, 34, '#c0602a', 0.55);
     if (pr.type === 'house') L(pr.x + 14, pr.y - 21, 22, '#b65a2b', 0.45);
     if (pr.type === 'ashcircle') L(pr.x, pr.y - 2, 34, '#8a6a52', 0.3 + Math.sin(time * 2) * 0.08);
     if (pr.type === 'bellpost') L(pr.x + 13, pr.y - 30, 10, '#b65a2b', 0.25);
   }
   const p = world.player;
-  L(p.cx() + (p.facing > 0 ? 3 : -3), p.y + p.h - 24, 11, '#a72f2f', 0.4 + Math.sin(time * 4) * 0.15);
+  L(p.cx() + (p.facing > 0 ? 4 : -4), p.y + p.h - 23, 6, '#c8383a', 0.3 + Math.sin(time * 4) * 0.1);
+  L(p.cx(), p.cy(), 62, '#6a6676', world.inCave ? 0.5 : 0.12, 1);
   // na cripta o Errante carrega um pouco de luz própria
-  if (world.inCave) L(p.cx(), p.cy(), 90, '#4a4038', 0.55);
   for (const l of world.loot) L(l.x, l.y - 6, 18, '#b0893a', 0.6);
   for (const m of [...world.mobs, ...world.summons]) {
     if (m.dead) continue;
     const warn = m.state.endsWith('Wind') || m.state === 'windup' || m.state === 'wind';
+    L(m.cx(), m.cy(), m.type === 'sinoElite' ? 54 : 34, '#a89484', world.inCave ? 0.5 : 0.22, 1);
     const col = m.type === 'sino' ? '#c0562a' : '#b0602a';
     L(m.cx(), m.cy(), m.type === 'sino' ? 34 : 14, col, warn ? 0.55 : 0.2);
   }
@@ -320,7 +364,61 @@ function lights(ctx, world, cam, time) {
   for (const o of world.fx.objs) {
     if (o.constructor.name === 'Projectile') L(o.x, o.y, o.owner === 'player' ? 22 : 12, o.owner === 'player' ? '#d06a30' : '#7a4a30', 0.6);
     else if (o.constructor.name === 'AshPatch') { const arming = o.t > o.fuse - o.warn; L(o.x, o.y - 3, arming ? 26 : 10, arming ? '#d0502a' : '#5a534f', arming ? 0.6 : 0.2); }
-    else if (o.constructor.name === 'Shockwave') L(o.x, o.y - 5, 18, '#d06a30', 0.5);
+    else if (o.constructor.name === 'Shockwave') L(o.x, o.y - 5, 22, '#ff9050', 0.7);
+  }
+  for (const v of world.fx.vis) if (v.k === 'star') L(v.x, v.y, 40, v.color === '#fff6e0' ? '#ffe0b0' : v.color, 0.8 * (1 - v.t / v.d));
+  // 1) multiplica: escuro fora das luzes
+  if (!lmC) { [lmC, lmX] = canvas(VW / LK, VH / LK); }
+  const k = world.ambK === undefined ? (world.inCave ? 1 : 0) : world.ambK;
+  world.ambK = k + ((world.inCave ? 1 : 0) - k) * 0.06;
+  const mix = (a, b) => Math.round(a + (b - a) * world.ambK);
+  lmX.globalCompositeOperation = 'source-over'; lmX.fillStyle = `rgb(${mix(200, 98)},${mix(192, 106)},${mix(206, 132)})`; lmX.fillRect(0, 0, lmC.width, lmC.height);
+  lmX.globalCompositeOperation = 'lighter'; lmX.imageSmoothingEnabled = true;
+  for (const [x, y, r, col, a] of list) { const R = r * 2.1 / LK; lmX.globalAlpha = Math.min(1, a * 0.95); lmX.drawImage(glow(col, 32), x / LK - R, y / LK - R, R * 2, R * 2); }
+  lmX.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'multiply'; ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(lmC, 0, 0, VW, VH);
+  // 2) soma: o brilho perto da fonte
+  ctx.globalCompositeOperation = 'lighter';
+  for (const [x, y, r, col, a, soft] of list) { if (soft) continue; ctx.globalAlpha = Math.min(1, a * 0.34); ctx.drawImage(glow(col, 32), x - r, y - r, r * 2, r * 2); }
+  ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false; ctx.globalCompositeOperation = 'source-over';
+}
+
+// Arco de corte: cada golpe tem o seu desenho. a0→a1 em graus (0 = frente, 90 = baixo), k = achatamento, r = raio extra
+const SW = {
+  A: { a0: 165, a1: -85, k: 1, r: 3, d: 0.1 }, B: { a0: -165, a1: 40, k: 0.42, r: 7, d: 0.1 }, C: { a0: -140, a1: 60, k: 1, r: 8, d: 0.12 },
+  P: { a0: -155, a1: 70, k: 1, r: 8, d: 0.12 }, D: { a0: -170, a1: 20, k: 0.34, r: 18, d: 0.13 }, T: { line: 1, r: 14, d: 0.1 },
+  J: { line: 1, r: 4, d: 0.08, fist: 1 }, K: { line: 1, r: 6, d: 0.08, fist: 1 }, H: { a0: 80, a1: -60, k: 0.8, r: 6, d: 0.1, fist: 1 },
+};
+const SWCOL = { ruptura: ['255,110,50', '255,220,160'], machado: ['190,200,225', '255,255,255'], agulhas: ['170,220,255', '255,255,255'], lanca: ['225,215,200', '255,255,255'], fio: ['225,215,205', '255,255,255'] };
+function drawTrail(ctx, p, cam, time) {
+  const w = p.sw;
+  if (!w) return;
+  const g = SW[w.key], e = time - w.t, life = g.d + 0.13;
+  if (e < 0 || e > life) return;
+  const f = w.facing, R = w.reach + g.r, cx = p.cx() - cam.x + f * 2, cy = p.y + p.h - 22 - cam.y;
+  const k = Math.min(1, e / g.d), ease = 1 - (1 - k) * (1 - k), fade = e < g.d ? 1 : 1 - (e - g.d) / 0.13;
+  const [c0, c1] = g.fist ? ['200,190,180', '255,250,240'] : SWCOL[w.weapon] || SWCOL.fio;
+  ctx.globalCompositeOperation = 'lighter';
+  if (g.line) {
+    const l = R * ease, h = (g.fist ? 5 : 4) * fade;
+    for (const [c, a, m] of [[c0, 0.45, 1.7], [c1, 0.9, 0.7]]) {
+      ctx.fillStyle = `rgba(${c},${a * fade})`; ctx.beginPath(); ctx.moveTo(cx + f * 4, cy); ctx.lineTo(cx + f * l * 0.7, cy - h * m); ctx.lineTo(cx + f * (l + 4), cy); ctx.lineTo(cx + f * l * 0.7, cy + h * m); ctx.fill();
+    }
+  } else {
+    const A0 = g.a0 * Math.PI / 180, A1 = g.a1 * Math.PI / 180, head = A0 + (A1 - A0) * ease, tail = A0 + (A1 - A0) * Math.max(0, ease - 0.75 + (e > g.d ? (e - g.d) * 4 : 0));
+    const n = 22, P = (a, r) => [cx + Math.cos(a) * r * f, cy + Math.sin(a) * r * g.k];
+    for (const [c, al, thick] of [[c0, 0.5, 0.55], [c1, 0.85, 0.2]]) {
+      for (let i = 0; i < n; i++) {
+        const q0 = i / n, q1 = (i + 1) / n, a0 = tail + (head - tail) * q0, a1 = tail + (head - tail) * q1;
+        const t0 = thick * Math.sin(q0 * 2.6), t1 = thick * Math.sin(q1 * 2.6);
+        const b0 = P(a0, R), b1 = P(a1, R), b2 = P(a1, R * (1 - t1)), b3 = P(a0, R * (1 - t0));
+        ctx.fillStyle = `rgba(${c},${al * q1 * q1 * fade})`;
+        ctx.beginPath(); ctx.moveTo(b0[0], b0[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(b2[0], b2[1]); ctx.lineTo(b3[0], b3[1]); ctx.fill();
+      }
+    }
+    // ponta acesa
+    const h = P(head, R * 0.97); ctx.fillStyle = `rgba(255,255,255,${0.9 * fade})`; ctx.fillRect(r2(h[0]) - 1, r2(h[1]) - 1, 2, 2);
   }
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -341,6 +439,7 @@ function drawVignette(ctx) {
 function drawBreakable(ctx, b, cam) {
   const x = b.x - cam.x, y = b.y - cam.y;
   if (x < -20 || x > VW + 20 || y < -10 || y > VH + 20) return;
+  if (!b.broken) return piece(ctx, b.type === 'pot' ? 'pote' : 'caixa', x, y + 1);
   blit(ctx, cached(`br:${b.type}:${b.broken}`, 24, 24, (c) => rawBreakable(c, b, 12, 20)), x, y, 12, 20);
 }
 function rawBreakable(ctx, b, sx, sy) {
@@ -355,9 +454,7 @@ function rawBreakable(ctx, b, sx, sy) {
 
 function drawLoot(ctx, l, cam, time) {
   const sx = r2(l.x - cam.x), sy = r2(l.y - cam.y - 6 - Math.sin(time * 3) * 2);
-  ctx.fillStyle = '#0e0d10'; ctx.fillRect(sx - 4, sy - 4, 9, 9);
-  ctx.fillStyle = '#d4b66f'; ctx.fillRect(sx - 3, sy - 3, 7, 7);
-  ctx.fillStyle = '#fff3c4'; ctx.fillRect(sx - 1, sy - 6, 3, 2); ctx.fillRect(sx, sy - 2, 1, 5);
+  piece(ctx, 'i_' + l.id, sx, sy + 8);
 }
 
 // ---------- HUD ----------
@@ -431,13 +528,7 @@ function drawHUD(ctx, world, time, dt) {
   const keys = !touch;
   const pid = world.prog.potion, PT = POTIONS[pid], have = p.flasks[pid];
   slot(ctx, 10, by, String(have), false, (c, x, y) => {
-    c.fillStyle = '#d8d0c2'; c.fillRect(x + 7, y + 2, 4, 3);
-    c.fillStyle = '#0a090c'; c.fillRect(x + 4, y + 5, 10, 11);
-    c.fillStyle = have > 0 ? PT.dark : '#2e2e30'; c.fillRect(x + 5, y + 6, 8, 9);
-    c.fillStyle = have > 0 ? PT.color : '#3a3a3c'; c.fillRect(x + 6, y + 7, 2, 4);
-    // formas diferentes além da cor: cruz, escudo e espada
-    c.fillStyle = '#f0e8d8';
-    if (pid === 'cura') { c.fillRect(x + 9, y + 9, 1, 4); c.fillRect(x + 8, y + 10, 3, 1); } else if (pid === 'defesa') { c.fillRect(x + 8, y + 9, 4, 2); c.fillRect(x + 9, y + 11, 2, 2); } else { c.fillRect(x + 9.5, y + 8, 1, 5); c.fillRect(x + 8.5, y + 11, 3, 1); }
+    c.globalAlpha = have > 0 ? 1 : 0.3; piece(c, 'i_' + pid, x + 9, y + 17); c.globalAlpha = 1;
   }, Math.max(0, p.drinkCd / 1.5), keys ? 'Q' : null);
   // os outros tipos, em miniatura (R troca)
   POTION_IDS.forEach((id, i) => {
@@ -461,11 +552,15 @@ function drawHUD(ctx, world, time, dt) {
   // item rápido (bomba, óleo, selo)
   const q = world.prog.quick, qn = world.prog.items[q] || 0;
   slot(ctx, 90, by, String(qn), false, (c, x, y) => {
-    if (q === 'bomba') { c.fillStyle = '#2b2a2f'; c.fillRect(x + 5, y + 7, 8, 8); c.fillStyle = '#6d4b32'; c.fillRect(x + 8, y + 4, 2, 3); c.fillStyle = '#ffb070'; c.fillRect(x + 9, y + 3, 1, 1); }
-    else if (q === 'oleo') { c.fillStyle = '#5a3d28'; c.fillRect(x + 6, y + 6, 6, 9); c.fillStyle = '#e17a3d'; c.fillRect(x + 7, y + 9, 4, 5); c.fillStyle = '#c9c1b8'; c.fillRect(x + 7, y + 4, 4, 2); }
-    else { c.fillStyle = '#d9b58a'; c.fillRect(x + 5, y + 5, 8, 9); c.fillStyle = '#a72f2f'; c.fillRect(x + 8, y + 7, 2, 5); c.fillRect(x + 7, y + 9, 4, 1); }
+    c.globalAlpha = qn > 0 ? 1 : 0.3; piece(c, 'i_' + q, x + 9, y + 17); c.globalAlpha = 1;
     if (p.itemCd > 0 && q === 'bomba') { c.globalAlpha = 0.6; c.fillStyle = '#000'; c.fillRect(x, y, 18, Math.round(18 * p.itemCd / 12)); c.globalAlpha = 1; }
   }, 0, keys ? 'C' : null);
+  // arma na mão (T troca)
+  slot(ctx, 116, by, null, true, (c, x, y) => {
+    const w = world.prog.equipped;
+    if (w) piece(c, 'i_' + w, x + 9, y + 17);
+    else { c.fillStyle = '#6a635e'; c.fillRect(x + 5, y + 7, 8, 6); c.fillRect(x + 4, y + 9, 2, 4); c.fillStyle = '#8a827b'; for (let i = 0; i < 4; i++) c.fillRect(x + 5 + i * 2, y + 6, 1.5, 3); }
+  }, 0, keys ? 'T' : null);
   // moedas
   ctx.fillStyle = '#0a090c'; ctx.fillRect(24 + 88 + 6, 15, 3, 3);
   ctx.fillStyle = '#d4b66f'; ctx.fillRect(24 + 88 + 7, 16, 3, 3);
@@ -487,7 +582,7 @@ function drawHUD(ctx, world, time, dt) {
   if (world.arenaLocked && b && !b.dead && b.state !== 'dormant') {
     const frac = b.hp / b.def.hp;
     ghost.boss = ghost.boss > frac ? Math.max(frac, ghost.boss - dt * 0.25) : frac;
-    const w = touch ? 180 : 220, x = Math.round((VW - w) / 2) + (touch ? -40 : 48), y = touch ? 26 : VH - 20;
+    const w = touch ? 180 : 220, x = Math.round((VW - w) / 2) + (touch ? -40 : 62), y = touch ? 26 : VH - 20;
     text(ctx, b.def.name.toUpperCase(), x, y - 5, '#d9b58a', 'left', 8);
     bar(ctx, x, y, w, 4, frac, '#a72f2f', '#d0505a', ghost.boss);
     ctx.fillStyle = '#ffd27a'; ctx.fillRect(x + w / 2 - 30, y + 7, Math.round(60 * Math.min(1, b.posture / b.def.posture)), 1);
@@ -559,8 +654,6 @@ export function renderWorld(ctx, world, time, dt) {
   drawTiles(ctx, world, cam, time);
   for (const pr of world.level.props) drawProp(ctx, pr, cam, time);
   for (const it of world.interactables) drawInteractable(ctx, it, world, cam, time);
-  if (underground) { ctx.globalAlpha = 0.28; ctx.fillStyle = '#07070c'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
-  lights(ctx, world, cam, time);
   for (const b of world.breakables) drawBreakable(ctx, b, cam);
   for (const f of world.fauna) { const fx = f.fx - cam.x; if (fx > -20 && fx < VW + 20) drawFauna(ctx, f, fx, f.fy - cam.y, time); }
   for (const l of world.loot) drawLoot(ctx, l, cam, time);
@@ -573,18 +666,39 @@ export function renderWorld(ctx, world, time, dt) {
   const b = world.boss;
   if (b && Math.abs(b.cx() - cam.x - VW / 2) < VW) { drawAsgmor(ctx, b, b.cx() - cam.x, b.y + b.h - cam.y, time); if (b.isBroken()) brokenMark(ctx, b.cx() - cam.x, b.y - cam.y - 34, time); }
   const p = world.player;
+  for (const g of p.ghosts) drawErrante(ctx, { facing: g.facing, an: { n: g.n, f: g.f }, flash: 0, invuln: 0, dead: false, perfectFlash: 0, ghost: p.action === 'ability' ? '#d9b58a' : '#7f8fb8' }, g.x - cam.x, g.y - cam.y, time, g.t * 1.6);
   drawErrante(ctx, p, p.cx() - cam.x, p.y + p.h - cam.y, time);
+  lights(ctx, world, cam, time);
+  // feixes das janelas passam na frente de tudo, com poeira
+  for (const pr of world.level.props) if (pr.type === 'janela') { const x = pr.x - cam.x, y = pr.y - cam.y; if (x > -160 && x < VW + 40 && y > -160 && y < VH + 80) shaft(ctx, x, y - 6, time, 24, 130); }
+  drawTrail(ctx, p, cam, world.time);
   world.fx.draw(ctx, cam);
-  if (!underground) ashFall(ctx, cam, time, world, 1);
-  drawVignette(ctx);
+  if (!underground) { ashFall(ctx, cam, time, world, 1); fog(ctx, cam, time, VH - 78, 1.15, 0.5, 16); } else fog(ctx, cam, time, VH - 84, 1.1, 0.35, 6);
+  foreground(ctx, cam, time, world);
   if (world.flashScreen > 0) { ctx.globalAlpha = world.flashScreen * 3; ctx.fillStyle = '#fff3c4'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
   drawHUD(ctx, world, time, dt);
 }
 
-// Fundo reutilizado na tela-título
-export function renderBackdrop(ctx, camX, time, world) {
-  const cam = { x: camX, y: 640 };
-  backdrop(ctx, cam, time, world);
-  ashFall(ctx, cam, time, world, 0);
+// Silhuetas escuras bem perto da câmera dão profundidade
+function foreground(ctx, cam, time, world) {
+  if (world.arenaLocked) return;
+  ctx.globalAlpha = 0.82;
+  const p = 1.35, step = 300, i0 = Math.floor((cam.x * p - 80) / step);
+  for (let i = i0; i <= i0 + 3; i++) {
+    const h = hash(i * 7.3 + (world.inCave ? 50 : 0)); if (h < 0.35) continue;
+    const x = i * step + h * 160 - cam.x * p;
+    if (x < -120 || x > VW + 120) continue;
+    ctx.fillStyle = '#050609';
+    if (world.inCave) {
+      const sw = Math.sin(time * 0.8 + i) * 2;
+      for (let y = 0; y < 34 + h * 34; y += 4) { ctx.fillRect(r2(x + sw * y / 60), y, 2, 3); ctx.fillRect(r2(x + sw * y / 60) - 0.5, y + 1, 3, 1); }
+    } else {
+      const dir = h > 0.65 ? 1 : -1;
+      for (let k = 0; k < 60; k++) { ctx.fillRect(r2(x + dir * k * 0.9), r2(-2 + Math.sin(k / 9 + i) * 3 + k * 0.28), 2, Math.max(1, 5 - k / 14)); if (k % 11 === 4) ctx.fillRect(r2(x + dir * k * 0.9), r2(k * 0.28), 1, 8 + (k % 5)); }
+    }
+  }
+  ctx.globalAlpha = 1;
 }
+
+export function renderAsh(ctx, time) { const cam = { x: time * 6, y: 640 }; ashFall(ctx, cam, time, { ashUp: false }, 0); ashFall(ctx, cam, time, { ashUp: false }, 1); }
 export { light, drawVignette };

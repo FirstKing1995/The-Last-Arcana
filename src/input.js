@@ -5,9 +5,10 @@ const BIND = {
   down: ['KeyS', 'ArrowDown'],
   jump: ['Space', 'KeyW', 'ArrowUp'],
   dodge: ['ShiftLeft', 'ShiftRight'],
-  light: ['KeyJ'],
-  heavy: ['KeyK'],
-  parry: ['KeyL'],
+  light: ['KeyJ', 'KeyZ', 'Mouse0'],
+  heavy: ['KeyK', 'KeyX', 'Mouse2'],
+  nextweapon: ['KeyT'],
+  parry: ['KeyL', 'Mouse1'],
   potion: ['KeyQ'],
   interact: ['KeyE'],
   nextpotion: ['KeyR'],
@@ -27,7 +28,7 @@ const BIND = {
 const PAD = {
   0: ['jump', 'confirm'], 1: ['dodge'], 2: ['light'], 3: ['heavy'],
   4: ['parry'], 5: ['ability'], 6: ['nextpotion'], 7: ['interact', 'confirm'],
-  8: ['inventory'], 9: ['pause'], 10: ['item'], 11: ['cycle'], 12: ['swap', 'up'], 13: ['potion'], 14: ['left'], 15: ['right'],
+  8: ['inventory'], 9: ['pause'], 10: ['item'], 11: ['nextweapon'], 12: ['swap', 'up'], 13: ['potion'], 14: ['left'], 15: ['right'],
 };
 
 const codeDown = new Set();
@@ -52,12 +53,25 @@ window.addEventListener('keydown', (e) => {
   Input.onAny && Input.onAny();
 });
 window.addEventListener('keyup', (e) => { codeDown.delete(e.code); });
+// Mouse: esquerdo ataca, direito golpe pesado, meio apara, roda troca de arma
+window.addEventListener('mousedown', (e) => {
+  if (Input.touchMode || !Input.mouseOn || !Input.mouseOn(e)) return;
+  e.preventDefault();
+  const code = 'Mouse' + e.button;
+  codeDown.add(code);
+  for (const a of actionsFor(code)) pressTime[a] = now();
+  Input.onAny && Input.onAny();
+});
+window.addEventListener('mouseup', (e) => { codeDown.delete('Mouse' + e.button); });
+window.addEventListener('contextmenu', (e) => { if (Input.mouseOn && Input.mouseOn(e)) e.preventDefault(); });
+window.addEventListener('wheel', (e) => { if (Input.mouseOn && Input.mouseOn(e) && Math.abs(e.deltaY) > 10) pressTime.nextweapon = now(); }, { passive: true });
 window.addEventListener('blur', () => { codeDown.clear(); padDown.clear(); virtDown.clear(); });
 window.addEventListener('pointerdown', () => { Input.onAny && Input.onAny(); });
 
 export const Input = {
   onAny: null,
   interceptor: null,
+  mouseOn: null,
   down(a) {
     if (BIND[a] && BIND[a].some((c) => codeDown.has(c))) return true;
     return padDown.has(a) || virtDown.has(a);

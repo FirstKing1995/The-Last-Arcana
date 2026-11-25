@@ -59,11 +59,13 @@ export class Level {
     this.ground(20, 28, 49); this.ground(23, 26, 48);
     this.prop('column', 12, G, { broken: 1 }); this.prop('fallenbell', 31, G); this.prop('deadtree', 17, G); this.prop('deadtree', 34, G, { v: 1 });
     this.spawn('herb', 15, G, { id: 'liq1', herb: 'liquen' });
+    this.spawn('chest', 25, 48, { id: 'primeira', reward: 'weapon', weapon: 'fio' });
+    this.prop('ossos', 11, G); this.prop('estatua', 29, G);
     this.spawn('fauna', 25, 48, { kind: 'lagarto' });
 
     // A02 Cinzeiral: povoado seguro
-    this.prop('house', 43, G); this.prop('house', 57, G, { v: 1 }); this.prop('house', 69, G);
-    this.prop('bellpost', 39, G); this.prop('bellpost', 78, G); this.prop('forge', 65, G); this.prop('fallenbell', 53, G);
+    this.prop('casa1', 44, G); this.prop('casa2', 56, G); this.prop('forjaria', 65, G); this.prop('casa1', 74, G, { flip: 1 });
+    this.prop('bellpost', 39, G); this.prop('bellpost', 78, G); this.prop('fallenbell', 53, G);
     this.spawn('shrine', 48, G, { id: 'cinzeiral', name: 'Pira de Cinzeiral' });
     this.spawn('elion', 52, G); this.spawn('morren', 60, G); this.spawn('ysara', 63, G);
     this.spawn('chest', 40, G, { id: 'inicial', reward: 'weapon', weapon: 'lanca' });
@@ -82,6 +84,7 @@ export class Level {
     this.fill(122, 152, 38, 41, '#'); this.caves.push([122, 42, 152, 49]);
     for (const x of [126, 134, 142, 149]) this.prop('column', x, G, { tall: 1 });
     this.prop('torch', 130, 46); this.prop('torch', 146, 46);
+    this.prop('janela', 132, 47); this.prop('janela', 140, 47); this.prop('estandarte', 136, 46); this.prop('ossos', 128, G);
     this.spawn('braseiro', 138, G, { patrol: this.patrol(134, 142) });
     this.spawn('crate', 124, G, { id: 'v5' }); this.spawn('pot', 151, G, { id: 'v9' });
     this.spawn('herb', 145, G, { id: 'sal1', herb: 'salvia' });
@@ -110,7 +113,7 @@ export class Level {
     // B08 Caverna de Cinza: corredor baixo com Rasteja-Fumaça
     this.carve(150, 187, 72, 77); this.shaftPlats(183, 187, 72, 76); this.fill(158, 167, 72, 74, '#');
     this.spawn('rasteja', 172, 78); this.spawn('rasteja', 154, 78);
-    this.prop('torch', 178, 74); this.prop('torch', 152, 74);
+    this.prop('torch', 178, 74); this.prop('torch', 152, 74); this.prop('gaiola', 170, 75); this.prop('ossos', 156, 78);
     this.spawn('herb', 163, 78, { id: 'liq2', herb: 'liquen' });
     // B09 Passagem Baixa: o caminho sobe pela plataforma; o segredo fica sob ela (deslize)
     this.carve(112, 149, 67, 77); this.fill(118, 128, 70, 77, '#');
@@ -119,7 +122,7 @@ export class Level {
     this.spawn('chest', 121, 78, { id: 'passagem', reward: 'weapon', weapon: 'agulhas', coins: 60 });
     this.prop('crack', 129, 78);
     this.spawn('cinzeiro', 141, 78, { patrol: this.patrol(138, 146) });
-    this.spawn('cinzeiro', 123, 70); this.prop('torch', 147, 73); this.prop('torch', 115, 70);
+    this.spawn('cinzeiro', 123, 70); this.prop('torch', 147, 73); this.prop('torch', 115, 70); this.prop('janela', 143, 74); this.prop('estatua', 146, 78);
 
     // ================= SETOR C: complexo interno =================
     // C10 Cripta de Serviço
@@ -128,19 +131,20 @@ export class Level {
     this.spawn('pot', 108, 78, { id: 'v10' }); this.spawn('crate', 104, 78, { id: 'v11' });
     for (const x of [90, 106]) this.prop('torch', x, 73);
     for (const x of [94, 98, 102]) this.prop('coffin', x, 78);
+    this.prop('janela', 97, 75); this.prop('estandarte', 103, 74); this.prop('gaiola', 109, 75);
     this.carve(84, 88, 78, 83); this.plat(84, 88, 78);
     // C11 Fundações
     this.carve(84, 130, 84, 93); this.shaftPlats(84, 88, 79, 92);
     this.fill(98, 99, 89, 93, '#'); this.fill(112, 113, 88, 93, '#');
     this.plat(94, 96, 91); this.plat(102, 105, 90); this.plat(107, 110, 90); this.plat(115, 118, 91);
     this.spawn('rasteja', 92, 94); this.spawn('gralha', 106, 94); this.spawn('cinzeiro', 122, 94, { patrol: this.patrol(118, 127) });
-    this.spawn('herb', 104, 94, { id: 'sal2', herb: 'salvia' }); this.prop('torch', 101, 86); this.prop('torch', 121, 87);
+    this.spawn('herb', 104, 94, { id: 'sal2', herb: 'salvia' }); this.prop('torch', 101, 86); this.prop('torch', 121, 87); this.prop('ossos', 126, 94); this.prop('gaiola', 106, 88); this.prop('estatua', 92, 94);
     // C12 Mecanismo dos Sinos: duas alavancas de sino abrem a comporta (sem item, sem Arcano)
     this.carve(131, 166, 82, 93); this.fill(130, 130, 84, 89, '#');
     this.spawn('shrine', 134, 94, { id: 'fundacoes', name: 'Pira das Fundações' });
     this.plat(139, 142, 91); this.plat(144, 147, 88); this.plat(150, 153, 87); this.plat(156, 159, 84);
     this.spawn('lever', 146, 88, { id: 'mec1' }); this.spawn('lever', 158, 84, { id: 'mec2' });
-    this.prop('gearbell', 151, 94); this.spawn('braseiro', 161, 94, { patrol: this.patrol(155, 163) });
+    this.prop('engrenagem', 151, 92, { scale: 1.2 }); this.prop('janela', 140, 90); this.prop('janela', 161, 90); this.spawn('braseiro', 161, 94, { patrol: this.patrol(155, 163) });
     this.fill(167, 167, 82, 89, '#'); this.fill(167, 167, 90, 93, 'M');
     this.spawn('sign', 165, 94, { id: 'comporta' });
     // C13 Cisterna de Fuligem: por cima, rota segura; no fundo, risco e recompensa
@@ -148,18 +152,19 @@ export class Level {
     this.plat(176, 179, 93); this.plat(183, 186, 92); this.plat(190, 193, 92); this.plat(196, 198, 93); this.plat(174, 175, 96); this.plat(198, 199, 96);
     this.spawn('rasteja', 181, 98); this.spawn('cinzeiro', 189, 98); this.spawn('gralha', 188, 98);
     this.spawn('chest', 194, 98, { id: 'fosso', reward: 'coins', amount: 160 });
-    this.spawn('herb', 178, 98, { id: 'liq3', herb: 'liquen' }); this.prop('torch', 171, 89); this.prop('torch', 203, 89);
+    this.spawn('herb', 178, 98, { id: 'liq3', herb: 'liquen' }); this.prop('torch', 171, 89); this.prop('torch', 203, 89); this.prop('janela', 187, 90); this.prop('ossos', 184, 98);
     // C14 Galeria das Correntes: subida de volta à luz
     this.carve(207, 232, 82, 93); this.spawn('braseiro', 216, 94, { patrol: this.patrol(212, 221) });
     this.carve(226, 231, G, 81); this.plat(226, 231, G); this.shaftPlats(226, 231, 53, 92);
-    for (const x of [210, 214, 220, 224]) this.prop('chain', x, 82);
+    for (const x of [210, 219]) this.prop('gaiola', x, 87 + (x % 2));
+    this.prop('sinao', 214, 90); this.prop('estandarte', 224, 88);
     this.prop('torch', 212, 88); this.prop('torch', 222, 88);
 
     // ================= SETOR D: acesso profundo =================
     // D15 Pátio do Sino-Fendido (especialista) e o portão do atalho
     this.spawn('lever', 202, G, { id: 'portao' });
     this.spawn('sino', 214, G); this.spawn('cinzeiro', 208, G); this.spawn('gralha', 221, G);
-    this.prop('fallenbell', 206, G); this.prop('column', 224, G, { broken: 1 }); this.prop('bellpost', 234, G);
+    this.prop('fallenbell', 206, G); this.prop('column', 224, G, { broken: 1 }); this.prop('estatua', 231, G); this.prop('ossos', 211, G); this.prop('bellpost', 234, G);
     this.spawn('herb', 218, G, { id: 'flor3', herb: 'flor' });
     // D16 Subida Externa Quebrada
     this.fill(263, W - 1, TOP, H - 1, '#');
@@ -171,6 +176,7 @@ export class Level {
     this.spawn('shrine', 284, TOP, { id: 'campanario', name: 'Pira do Campanário' });
     // D18 Antecâmara
     this.fill(291, 305, 12, 13, '#'); this.caves.push([292, 14, 304, 21]); this.fill(291, 291, 12, 16, '#');
+    this.fill(304, 304, 18, 21, 'K'); this.spawn('sign', 302, TOP, { id: 'chefe' }); this.prop('janela', 297, 20); this.prop('estatua', 293, TOP); this.prop('estandarte', 300, 19);
     this.spawn('stone', 297, TOP, { id: 'antessala' }); this.prop('torch', 294, 17); this.prop('torch', 301, 17);
 
     // ================= ARENA: Campanário Caído (3,5 telas) =================
@@ -191,6 +197,8 @@ export class Level {
     const X = (x) => x + CX, Y = (y) => y + CY;
     this.carve(X(130), X(132), G, Y(25));
     this.prop('cryptgate', X(131), G);
+    for (const x of [112, 60, 25]) this.prop('janela', X(x), Y(30));
+    this.prop('gaiola', X(118), Y(30)); this.prop('ossos', X(55), Y(32)); this.prop('estatua', X(37), Y(32));
     this.carve(X(101), X(132), Y(26), Y(31)); this.carve(X(71), X(100), Y(26), Y(31)); this.carve(X(41), X(70), Y(26), Y(31)); this.carve(X(10), X(40), Y(23), Y(31));
     for (const y of [G, 53, 56, 59, 61]) this.plat(X(130), X(132), y);
     for (const x of [79, 87, 95]) this.fill(X(x), X(x), Y(29), Y(31), '#');

@@ -17,34 +17,34 @@ Também funciona no GitHub Pages: Settings → Pages → *Deploy from a branch* 
 
 O progresso é salvo no navegador ao descansar nas piras, abrir baús, comprar e vencer chefes. Na tela-título aparece **Continuar**.
 
-### Teclado
+### Teclado e mouse
 
-| Tecla | Ação |
+| Comando | Ação |
 |---|---|
-| A / D | mover |
-| W / Espaço | pular (segure para pular mais alto; S + Espaço desce da plataforma) |
-| Shift | esquiva com invulnerabilidade; desliza sob passagens baixas (segure para correr) |
-| J | ataque leve (combo) |
-| K | ataque pesado (segure para carregar) |
-| L | aparar (parry) |
-| Q | beber a poção escolhida |
-| R | trocar a poção (Cura, Defesa, Dano) |
-| F | habilidade do Arcano ativo |
-| Tab | trocar Arcano primário/secundário |
-| C / V | usar / trocar o item rápido (bomba, óleo, selo) |
+| A / D | correr |
+| W / Espaço | pular (segure para pular mais alto; na parede, salta para o outro lado; S + Espaço desce da tábua) |
+| S correndo | deslizar por baixo de passagens |
+| Shift | rolar com invulnerabilidade |
+| J, Z ou clique | atacar (combo de 3; no fim do rolamento vira investida) |
+| K, X ou botão direito | golpe pesado (segure para carregar; no ar, mergulho) |
+| L ou botão do meio | aparar |
+| T ou roda do mouse | trocar de arma |
+| Q / R | beber / trocar a poção |
+| F / Tab | habilidade do Arcano / trocar Arcano |
+| C / V | usar / trocar o item rápido |
 | E | interagir, colher, finalizar inimigo com a postura quebrada |
-| I | inventário (armas, poções, relíquias, itens, Arcanos) |
-| N | mapa |
-| M | som liga/desliga |
-| Esc | pausa |
+| I / N | inventário / mapa |
+| M / Esc | som / pausa |
+
+O Errante se agarra sozinho nas beiradas ao alcance e sobe degraus correndo.
 
 ### Celular
 
-Jogue com a tela deitada. Arraste o lado esquerdo da tela para mover. Os botões ficam à direita (PULAR, ATACAR, PESADO, ESQUIVA, APARAR, E, POÇÃO e TIPO) e no topo (pausa, INV, ⇄, ARC, ITEM e MAPA). No Android, o jogo entra em tela cheia.
+Jogue com a tela deitada. Arraste o lado esquerdo da tela para mover. Os botões ficam à direita (PULAR, ATACAR, PESADO, ESQUIVA, APARAR, E, POÇÃO e TIPO) e no topo (pausa, INV, ⇄, ARC, ITEM, MAPA e ARMA). Correndo, puxe o analógico para baixo para deslizar. No Android, o jogo entra em tela cheia.
 
 ### Controle
 
-A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT troca a poção, RT interage. Direcional: ↑ troca Arcano e ↓ bebe frasco. Select abre o inventário; L3 e R3 usam e trocam o item rápido.
+A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT troca a poção, RT interage. Direcional: ↑ troca Arcano e ↓ bebe frasco. Select abre o inventário; L3 e R3 usa o item rápido e troca de arma.
 
 ## O que tem nesta versão
 
@@ -60,7 +60,9 @@ A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT troca a poç
 - **Maestria I–V** de O Louco: Salto de Cinzas, Risco Calculado e Caminho Improvável.
 - **Aliados**: Elion conta a história; Morren vende bombas, óleos e selos e compra ervas; Ysara aprimora armas de +1 a +5.
 - **Mundo vivo**: coleta de Líquen de Brasa, Sálvia Cinzenta e Flor de Cinza (as raras voltam depois de dois descansos), vasos e caixas quebráveis, e fauna neutra que foge.
-- **Arte oficial**: o Errante e o Asgmor são animados a partir das imagens do Pedro, por recorte e articulação, em pixel art de paleta limitada. Cenário, mobs e NPCs são gerados por código.
+- **Arte**: o Errante é um modelo próprio, feito a partir da arte do Pedro e renderizado em pixel art com cabelo e manto simulados; cada arma é uma peça de verdade na mão. O Asgmor é animado a partir da imagem do Pedro. Céu, ruínas, criaturas, NPCs e adereços seguem o manual.
+- **Luz**: mapa de luz por sala, feixes nas janelas, brilho e correção de cor por WebGL (sem WebGL, o jogo continua funcionando).
+- **Parkour**: corrida, deslize, rolamento, salto na parede, agarrar beiradas e cair rolando.
 - **Três poções** (Cura, Defesa e Dano) que dividem os mesmos frascos, preparados na pira.
 
 Veja [`docs/DESIGN.md`](docs/DESIGN.md) para a relação entre o manual e o código.
