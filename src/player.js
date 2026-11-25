@@ -526,7 +526,7 @@ export class Player {
         if (r !== 'guarded') {
           w.fx.slashHit(ix, iy, this.facing, kind === 'heavy' || this.cur === 'C' || this.cur === 'P' ? 1.6 : 1, this.prog.equipped === 'ruptura' ? '#ff9a5a' : '#fff6e0');
           this.foco = Math.min(this.maxFoco, this.foco + 1);
-          if (!e.isBoss && !e.isElite && e.def.speed > 0 && e.state !== 'broken') { e.vx = this.facing * (kind === 'heavy' ? 170 : 85); if (kind === 'heavy') e.vy = -120; }
+          if (!e.isBoss && !e.isElite && e.def.speed > 0 && e.state !== 'broken' && (kind === 'heavy' || !(e.armored && e.armored()))) { e.vx = this.facing * (kind === 'heavy' ? 170 : 85); if (kind === 'heavy') e.vy = -120; }
         }
         if (kind === 'ability') w.addMastery(3, 'ability');
         if (this.ashCharge > 0 && kind !== 'ability') {

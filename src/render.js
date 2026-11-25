@@ -633,7 +633,8 @@ function drawHUD(ctx, world, time, dt) {
   if (world.dialog) {
     const d = world.dialog;
     const [who, msg] = d.lines[d.i];
-    const x = 20, w = VW - 40, h = 64, y = touch ? 34 : VH - h - 10;
+    const full = wrap(ctx, msg, VW - 58, 8), h = Math.max(34, 18 + Math.min(5, full.length) * 9 + 6);
+    const x = 20, w = VW - 40, y = touch ? 34 : VH - h - 8;
     ctx.globalAlpha = 0.92; frameBox(ctx, x, y, w, h, '#6d4b32'); ctx.globalAlpha = 1;
     ctx.fillStyle = '#8b633f'; ctx.fillRect(x + 4, y + 4, 3, 3);
     text(ctx, who.toUpperCase(), x + 11, y + 10, '#d9b58a', 'left', 8);

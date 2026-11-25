@@ -218,6 +218,6 @@ function frame(now) {
     if (now - lastErr > 2000) { lastErr = now; console.error(e); }
   }
 }
-artReady.then(() => requestAnimationFrame(frame));
+artReady.then(() => { const l = document.getElementById('load'); if (l) l.remove(); requestAnimationFrame(frame); });
 canvas.focus();
 game.update = update; game.render = render; // usado pelos testes automatizados

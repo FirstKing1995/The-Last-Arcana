@@ -103,11 +103,13 @@ export class World {
     const tips = this.flags.tips || (this.flags.tips = {});
     if (tips[id]) return;
     tips[id] = true;
-    this.toast(text, dur);
+    // uma dica por vez: as outras esperam a vez
+    (this.tipQ = this.tipQ || []).push([text, dur]);
   }
 
   updateTips() {
     const p = this.player;
+    if (this.tipQ && this.tipQ.length && !this.toasts.length) this.toast(...this.tipQ.shift());
     if (p.dead) return;
     if (this.inCombat) this.tip('aviso', `Aviso amarelo: apare (${k('L', 'APARAR')}). Vermelho: esquive (${k('Shift', 'ESQUIVA')}).`, 6);
     if (p.vigor < 20) this.tip('vigor', 'Vigor baixo: pare de atacar um instante para recuperar.');

@@ -21,7 +21,7 @@ const BIND = {
   inventory: ['KeyI'],
   up: ['KeyW', 'ArrowUp'],
   mute: ['KeyM'],
-  confirm: ['Enter', 'KeyE', 'KeyJ', 'Space'],
+  confirm: ['Enter', 'KeyE', 'KeyJ', 'Space', 'Mouse0'],
 };
 
 // Controle padrão (Xbox/PS): botão -> ação

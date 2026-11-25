@@ -19,7 +19,7 @@ export class Mob {
     this.hp = this.def.hp; this.posture = 0; this.postureCd = 0;
     this.state = 'idle'; this.t = 0; this.dead = false; this.deathT = 0;
     this.facing = -1; this.aggro = false; this.flash = 0; this.burn = 0; this.burnTick = 0;
-    this.hitT = 0; this.hitDir = 1; this.hitDone = false; this.guarding = false; this.patrolI = 0; this.patrolWait = 0; this.alerted = false;
+    this.hitT = 0; this.hitDir = 1; this.hits = 0; this.lastHit = -9; this.reflexCd = 0; this.delay = 0; this.hitDone = false; this.guarding = false; this.patrolI = 0; this.patrolWait = 0; this.alerted = false;
   }
   alive() { return !this.dead; }
   cx() { return this.x + this.w / 2; }
@@ -29,6 +29,21 @@ export class Mob {
   set(s) { this.state = s; this.t = 0; this.hitDone = false; }
   isBroken() { return this.state === 'broken'; }
   endBreak() { if (this.state === 'broken') this.set('recover'); this.posture = 0; }
+  // Em preparação ou no golpe o inimigo não é empurrado: bater sem olhar sai caro
+  armored() { return ['windup', 'strike', 'slashWind', 'slash', 'lungeWind', 'lunge', 'bite', 'wind'].includes(this.state); }
+  // Reação ao ataque do Errante: cada tipo tem a sua (recuo, guarda, flanco). Devolve true se reagiu.
+  reflex(dt, chance) {
+    if (this.reflexCd > 0) { this.reflexCd -= dt; return false; }
+    const p = this.world.player;
+    if (p.action !== 'light' || p.t > 0.09 || this.dist > 62 || Math.abs(p.cy() - this.cy()) > 40) return false;
+    this.reflexCd = 0.9 + Math.random() * 0.9;
+    if (Math.random() > chance) return false;
+    this.evade();
+    return true;
+  }
+  evade() {}
+  // Revide: depois de apanhar em sequência, responde na hora (com aviso curto, mas sempre visível)
+  revide() {}
   applyBurn(sec) { this.burn = Math.max(this.burn, sec); }
 
   takeDamage(dmg, posture, dir, info = {}) {
@@ -47,15 +62,17 @@ export class Mob {
     this.postureCd = 2;
     this.flash = 0.09; this.hitT = 0.16; this.hitDir = dir || 1;
     this.aggro = true;
+    this.hits = w.time - this.lastHit < 1.1 ? this.hits + 1 : 1; this.lastHit = w.time;
     if (result !== 'guarded') { if (info.kind === 'heavy' || info.kind === 'finisher') sfx.hitHeavy(); else sfx.hit(); if (Math.random() < 0.5) sfx.mobHurt(); w.fx.burst(this.cx(), this.cy(), 6, this.bloodColor || '#e17a3d', 60, 0.35); }
     w.fx.number(this.cx(), this.y - 3, dmg, result === 'guarded' ? '#9aa0aa' : info.crit ? '#ffd23a' : '#f2e6d0');
     if (this.hp <= 0) { this.die(); return 'kill'; }
     if (this.posture >= this.def.posture && this.state !== 'broken') {
       this.set('broken'); this.vx = dir * 60; sfx.guard();
       w.fx.burst(this.cx(), this.y, 10, '#fff3c4', 60, 0.4, 0, 1);
-    } else if (this.flinches && this.flinches(info)) {
+    } else if (!this.armored() && this.flinches && this.flinches(info)) {
       this.vx = dir * 70;
     }
+    if (this.hits >= (this.patience || 2) && this.state !== 'broken' && !this.armored() && info.kind !== 'finisher') { this.hits = 0; this.revide(); }
     return result;
   }
 
@@ -171,25 +188,29 @@ export class Mob {
 export class Cinzeiro extends Mob {
   constructor(...a) { super(...a); this.bloodColor = '#d56a32'; this.aggroRange = 140; }
   flinches() { return true; }
+  evade() { if (!this.edgeAhead(-this.facing)) { this.vx = -this.facing * 190; this.vy = -130; this.set('hop'); } }
+  revide() { this.facing = Math.sign(this.dx) || this.facing; this.set('windup'); this.delay = 0.3; }
   think(dt) {
     const s = this.state, D = this.def;
     if (!this.aggro) return this.returnHome(dt);
+    if (s === 'hop') { if (this.t > 0.3) { this.set('windup'); this.delay = 0.26; } return; }
+    if (s === 'idle' || s === 'recover' || s === 'retreat') if (this.reflex(dt, 0.4)) return;
     if (s === 'idle' || s === 'recover') {
       if (s === 'recover' && this.t < 0.4) { this.vx *= 0.85; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 38) { this.set('windup'); this.vx = 0; }
+      if (this.dist < 72) { this.set('windup'); this.vx = 0; this.delay = 0.32 + Math.random() * 0.22; }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
-      if (this.t > 0.5) { this.set('strike'); this.vx = this.facing * 250; sfx.swing(); }
+      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('strike'); this.vx = this.facing * 340; this.vy = -80; sfx.swing(); }
     } else if (s === 'strike') {
-      this.vx *= 0.9;
+      this.vx *= 0.955;
       this.melee(this.front(16), D.dmg, { parryable: true });
-      if (this.t > 0.18) this.set('retreat');
+      if (this.t > 0.24) this.set('retreat');
     } else if (s === 'retreat') {
-      this.vx = -this.facing * 55;
+      this.vx = -this.facing * 75;
       if (this.edgeAhead(-this.facing)) this.vx = 0;
-      if (this.t > 0.6) this.set('idle');
+      if (this.t > 0.45) this.set('idle');
     }
   }
 }
@@ -198,29 +219,33 @@ export class Cinzeiro extends Mob {
 export class Braseiro extends Mob {
   constructor(...a) { super(...a); this.bloodColor = '#c85a2d'; this.aggroRange = 150; }
   flinches(info) { return info.kind === 'heavy'; }
+  evade() { this.vx = 0; this.set('guard'); this.delay = 0.45; }
+  revide() { this.facing = Math.sign(this.dx) || this.facing; this.set(Math.random() < 0.5 ? 'slashWind' : 'guard'); this.delay = this.state === 'guard' ? 0.5 : 0.28; }
   think(dt) {
     const s = this.state, D = this.def;
     this.guarding = s === 'guard';
     if (!this.aggro) return this.returnHome(dt);
+    if (s === 'idle' && this.reflex(dt, 0.55)) return;
     if (s === 'idle' || s === 'recover') {
-      if (s === 'recover' && this.t < 0.7) { this.vx *= 0.85; return; }
+      if (s === 'recover' && this.t < 0.55) { this.vx *= 0.85; return; }
       this.facing = Math.sign(this.dx) || this.facing;
       const r = Math.random();
-      if (this.dist < 46) {
-        this.vx = 0;
-        if (r < 0.55) this.set('slashWind'); else if (r < 0.75) this.set('guard'); else this.set('lungeWind');
-      } else if (this.dist < 110 && r < 0.012) { this.vx = 0; this.set('lungeWind'); }
+      if (this.dist < 62) {
+        this.vx = 0; this.delay = 0.34 + Math.random() * 0.24;
+        if (r < 0.62) this.set('slashWind'); else if (r < 0.78) { this.set('guard'); this.delay = 0.7; } else this.set('lungeWind');
+      } else if (this.dist < 150 && r < 0.03) { this.vx = 0; this.set('lungeWind'); }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'slashWind') {
       this.vx = 0;
-      if (this.t > 0.45) { this.set('slash'); this.vx = this.facing * 110; sfx.swing(); }
+      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('slash'); this.vx = this.facing * 190; sfx.swing(); }
     } else if (s === 'slash') {
-      this.vx *= 0.85;
+      this.vx *= 0.9;
       this.melee(this.front(36, this.h - 4, 2), D.dmg, { parryable: true });
-      if (this.t > 0.16) this.set('recover');
+      // às vezes emenda um segundo corte, com atraso: esquivar cedo demais custa
+      if (this.t > 0.18) { if (!this.second && this.dist < 70 && Math.random() < 0.45) { this.second = true; this.set('slashWind'); this.delay = 0.3; } else { this.second = false; this.set('recover'); } }
     } else if (s === 'lungeWind') {
       this.vx = 0;
-      if (this.t > 0.7) { this.set('lunge'); sfx.heavy(); }
+      if (this.t > 0.55) { this.facing = Math.sign(this.dx) || this.facing; this.set('lunge'); sfx.heavy(); }
     } else if (s === 'lunge') {
       this.vx = this.facing * 290;
       this.melee(this.front(30, this.h - 4, 2), D.dmg + 20, { parryable: true, knock: 1.4 });
@@ -228,30 +253,36 @@ export class Braseiro extends Mob {
     } else if (s === 'guard') {
       this.vx = 0;
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.t > 1.0) this.set('slashWind');
+      if (this.t > (this.delay || 0.8)) { this.set('slashWind'); this.delay = 0.26; }
     }
   }
 }
 
 // Rastejador — rente ao chão; golpes pesados (altos) passam por cima.
 export class Rasteja extends Mob {
-  constructor(...a) { super(...a); this.bloodColor = '#e6a34a'; this.aggroRange = 130; }
+  constructor(...a) { super(...a); this.bloodColor = '#e6a34a'; this.aggroRange = 150; }
   flinches() { return true; }
+  // passa por baixo e ataca pelas costas
+  evade() { this.vx = this.facing * 320; this.set('flank'); }
+  revide() { this.vx = -this.facing * 200; this.vy = -120; this.set('back'); }
   think(dt) {
     const s = this.state, D = this.def;
     if (!this.aggro) return this.returnHome(dt);
+    if (s === 'flank') { this.vx = this.facing * 320; if (this.t > 0.26 || this.hitWall) { this.facing = -this.facing; this.set('windup'); this.delay = 0.22; this.vx = 0; } return; }
+    if (s === 'back') { if (this.t > 0.28) { this.set('windup'); this.delay = 0.24; } return; }
+    if (s === 'idle' && this.reflex(dt, 0.5)) return;
     if (s === 'idle' || s === 'recover') {
-      if (s === 'recover' && this.t < 0.6) { this.vx *= 0.8; return; }
+      if (s === 'recover' && this.t < 0.45) { this.vx *= 0.8; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 40) { this.set('windup'); this.vx = 0; }
+      if (this.dist < 84) { this.set('windup'); this.vx = 0; this.delay = 0.28 + Math.random() * 0.16; }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
-      if (this.t > 0.35) { this.set('bite'); this.vx = this.facing * 280; this.vy = -90; sfx.swing(); }
+      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('bite'); this.vx = this.facing * 360; this.vy = -120; sfx.swing(); }
     } else if (s === 'bite') {
-      this.vx *= 0.93;
+      this.vx *= 0.965;
       this.melee(this.front(12, 11, -1), D.dmg, { parryable: true });
-      if (this.t > 0.22) this.set('recover');
+      if (this.t > 0.28) this.set('recover');
     }
   }
 }
@@ -326,10 +357,12 @@ export class Gralha extends Mob {
 
 // Especialista — sino rachado; badaladas geram ondas no chão e chamam um reforço.
 export class Sino extends Mob {
-  constructor(...a) { super(...a); this.bloodColor = '#e17a3d'; this.aggroRange = 170; }
+  constructor(...a) { super(...a); this.bloodColor = '#e17a3d'; this.aggroRange = 170; this.patience = 3; }
   reset() { super.reset(); this.summonedOnce = false; this.state = 'idle'; }
   flinches() { return false; }
   edgeAhead() { return true; }
+  // apanhou três vezes seguidas: badalada mais cedo, e quem está colado leva o tranco
+  revide() { if (this.state === 'recover' || this.state === 'idle') { this.set('wind'); this.t = this.type === 'sino' ? 0.4 : 0.45; this.quick = true; } }
   think() {
     const s = this.state;
     this.vx = 0;
@@ -344,6 +377,7 @@ export class Sino extends Mob {
         this.world.fx.add(new Shockwave(this.cx() - 12, gy, -1, this.def.dmg, { speed: 150, dist: 200 }));
         this.world.fx.add(new Shockwave(this.cx() + 12, gy, 1, this.def.dmg, { speed: 150, dist: 200 }));
         this.world.shake = Math.max(this.world.shake, 3);
+        if (this.dist < 34) this.world.player.takeHit(this.def.dmg * 0.6, this, { parryable: false, dir: Math.sign(this.dx) || 1, knock: 1.6 });
         if (!this.summonedOnce && !(this.type === 'sino' && this.world.prog.flags.cryptSilenced)) { this.summonedOnce = true; this.world.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 150, gy); }
         this.set('recover');
       }

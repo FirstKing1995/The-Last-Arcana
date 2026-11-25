@@ -11,6 +11,7 @@ function pose(m, time) {
     case 'cinzeiro':
       if (s === 'broken' || s === 'recoil') return 6;
       if (s === 'windup') return 4;
+      if (s === 'hop') return 6;
       if (s === 'strike') return 5;
       return mv ? cyc([1, 2, 3, 2], t, 11) : 0;
     case 'braseiro':
@@ -24,6 +25,7 @@ function pose(m, time) {
     case 'rasteja':
       if (s === 'broken' || s === 'recoil') return 6;
       if (s === 'windup') return 4;
+      if (s === 'back') return 6;
       if (s === 'bite') return 5;
       return mv ? cyc([1, 2, 3, 2], t, 12) : 0;
     case 'gralha':

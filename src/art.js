@@ -10,11 +10,18 @@ const LIST = {
   h_errante: 'sprites/h_errante.png', h_fio: 'sprites/h_fio.png', h_lanca: 'sprites/h_lanca.png', h_machado: 'sprites/h_machado.png', h_agulhas: 'sprites/h_agulhas.png', h_ruptura: 'sprites/h_ruptura.png',
   asgmor: 'sprites/asgmor.png', atlas: 'cena/atlas.png', ceu: 'cena/ceu.webp', torres: 'cena/torres.webp', ruinas: 'cena/ruinas.webp', parede: 'cena/parede.webp', rocha: 'cena/rocha.webp', capa: 'cena/capa.webp',
 };
+let done = 0;
+export const progress = { f: 0 };
+// rede de celular falha: cada arquivo tenta até 4 vezes
 export const artReady = Promise.all(Object.entries(LIST).map(([k, f]) => new Promise((ok) => {
-  const i = new Image();
-  i.onload = ok; i.onerror = () => { console.error('arte não carregou: ' + f); img[k] = canvas(2, 2)[0]; ok(); };
-  i.src = 'assets/' + f;
-  img[k] = i;
+  let n = 0;
+  const go = () => {
+    const i = new Image();
+    i.onload = () => { img[k] = i; done++; progress.f = done / Object.keys(LIST).length; const b = document.getElementById('lb'); if (b) b.style.width = progress.f * 100 + '%'; ok(); };
+    i.onerror = () => { if (++n < 4) setTimeout(go, 400 * n); else { console.error('arte não carregou: ' + f); img[k] = canvas(2, 2)[0]; ok(); } };
+    i.src = 'assets/' + f + (n ? '?t=' + n : '');
+  };
+  go();
 })));
 
 // Peça do atlas. (x, y) em unidades do mundo: centro-baixo da peça.

@@ -4,6 +4,15 @@ import { POTIONS, POTION_IDS, WEAPONS, UPGRADE, ARCANA, MASTERY, MASTERY_DESC, R
 import { masteryLevel, weaponName, addItem } from './state.js';
 import { sfx } from './audio.js';
 import { ROOMS, W as MW, H as MH } from './level.js';
+import { piece } from './art.js';
+
+const icons = {};
+function icon(n) {
+  if (icons[n]) return icons[n];
+  const c = document.createElement('canvas'); c.width = 34; c.height = 34;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.scale(2, 2); piece(x, 'i_' + n, 8.5, 16.5);
+  return (icons[n] = `<img class="ic" alt="" src="${c.toDataURL()}">`);
+}
 
 const CSS = `
 #menu { position: fixed; inset: 0; z-index: 8; display: none; align-items: center; justify-content: center;
@@ -18,11 +27,12 @@ const CSS = `
 #menu .tabs { display: flex; gap: 2px; padding: 8px 12px 0; flex-wrap: wrap; }
 #menu .tab { background: #1c191e; border: 1px solid #3a2f2a; border-bottom: none; color: #a59d95; font: inherit; font-size: 11px; padding: 6px 10px; cursor: pointer; }
 #menu .tab.on { background: #241f22; color: #e8d2a8; border-color: #6d4b32; }
-#menu .body { overflow-x: hidden; overflow-y: auto; padding: 10px 12px 14px; border-top: 1px solid #6d4b32; margin: 0 12px 12px; background: #19161b; }
+#menu .body { scrollbar-color: #6d4b32 #141216; scrollbar-width: thin; overflow-x: hidden; overflow-y: auto; padding: 10px 12px 14px; border-top: 1px solid #6d4b32; margin: 0 12px 12px; background: #19161b; }
 #menu .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px; border-bottom: 1px solid #2a2428; }
 #menu .row:last-child { border-bottom: none; }
 #menu .row.sel { background: #241f22; outline: 1px solid #8b633f; }
 #menu .name { font-size: 12px; color: #e8e0d0; }
+#menu img.ic { width: 34px; height: 34px; image-rendering: pixelated; vertical-align: middle; margin-right: 8px; }
 #menu .name small { color: #b66a3b; font-size: 10px; margin-left: 6px; }
 #menu .desc { grid-column: 1 / 2; font-family: system-ui, sans-serif; font-size: 12px; color: #a59d95; line-height: 1.35; }
 #menu .btn { background: #2a2024; border: 1px solid #8b633f; color: #f0e0b8; font: inherit; font-size: 11px; padding: 6px 10px; cursor: pointer; white-space: nowrap; grid-row: 1 / 3; grid-column: 2; }
@@ -188,7 +198,7 @@ function buildRows(world, tab) {
       const W = WEAPONS[id];
       const eq = prog.equipped === id;
       out.push({
-        name: `${weaponName(prog, id)}<small>${W.cat} · ${W.rarity}</small>${eq ? ' <span class="tag">equipada</span>' : ''}`,
+        name: `${icon(id)}${weaponName(prog, id)}<small>${W.cat} · ${W.rarity}</small>${eq ? ' <span class="tag">equipada</span>' : ''}`,
         desc: `${W.desc} Golpes: ${W.combo.length} · alcance ${W.reach} · ${W.speed > 1 ? 'rápida' : W.speed < 1 ? 'lenta' : 'equilibrada'}.`,
         btn: eq ? 'Equipada' : 'Equipar', disabled: eq,
         act: () => { p.equip(id); },
@@ -212,7 +222,7 @@ function buildRows(world, tab) {
     for (const id of POTION_IDS) {
       const P = POTIONS[id], other = POTION_IDS.filter((q) => q !== id && pr[q] > 0).sort((a, b) => pr[b] - pr[a])[0];
       out.push({
-        name: `${P.name} <small>agora ${p.flasks[id]} · preparo ${pr[id]}</small>${prog.potion === id ? ' <span class="tag">selecionada</span>' : ''}`,
+        name: `${icon(id)}${P.name} <small>agora ${p.flasks[id]} · preparo ${pr[id]}</small>${prog.potion === id ? ' <span class="tag">selecionada</span>' : ''}`,
         desc: `${P.desc} Recarga de 1,5 s.`, btn: 'Preparar +1', disabled: !other,
         act: () => { pr[other]--; pr[id]++; sfx.ui(); },
       });
@@ -222,9 +232,9 @@ function buildRows(world, tab) {
     for (const id of Object.keys(ITEMS)) {
       const it = ITEMS[id];
       const q = prog.quick === id;
-      out.push({ name: `${it.name} ×${prog.items[id] || 0}${q ? ' <span class="tag">item rápido</span>' : ''}`, desc: it.desc, btn: q ? 'Selecionado' : 'Usar como rápido', disabled: q, act: () => { prog.quick = id; sfx.ui(); } });
+      out.push({ name: `${icon(id)}${it.name} ×${prog.items[id] || 0}${q ? ' <span class="tag">item rápido</span>' : ''}`, desc: it.desc, btn: q ? 'Selecionado' : 'Usar como rápido', disabled: q, act: () => { prog.quick = id; sfx.ui(); } });
     }
-    for (const id of Object.keys(HERBS)) if (prog.herbs[id]) out.push({ name: `${HERBS[id].name} ×${prog.herbs[id]}`, desc: 'Erva do Vale das Cinzas. Morren compra.' });
+    for (const id of Object.keys(HERBS)) if (prog.herbs[id]) out.push({ name: `${icon(id)}${HERBS[id].name} ×${prog.herbs[id]}`, desc: 'Erva do Vale das Cinzas. Morren compra.' });
     for (const id of Object.keys(MATERIALS)) if (prog.materials[id]) out.push({ name: `${MATERIALS[id].name} ×${prog.materials[id]}`, desc: MATERIALS[id].desc });
   } else if (tab === 'arcanos') {
     const owned = prog.arcana.filter(Boolean);
@@ -244,7 +254,7 @@ function buildRows(world, tab) {
     for (const id of Object.keys(ITEMS)) {
       const it = ITEMS[id];
       const have = prog.items[id] || 0;
-      out.push({ name: `${it.name} <small>${it.price} moedas · você tem ${have}/${it.max}</small>`, desc: it.desc, btn: 'Comprar', disabled: prog.coins < it.price || have >= it.max, act: () => { if (addItem(prog, id)) { prog.coins -= it.price; sfx.chest(); } } });
+      out.push({ name: `${icon(id)}${it.name} <small>${it.price} moedas · você tem ${have}/${it.max}</small>`, desc: it.desc, btn: 'Comprar', disabled: prog.coins < it.price || have >= it.max, act: () => { if (addItem(prog, id)) { prog.coins -= it.price; sfx.chest(); } } });
     }
   } else if (tab === 'vender') {
     let any = false;

@@ -23,6 +23,7 @@ export class Asgmor extends Mob {
   }
   alive() { return !this.dead && this.state !== 'dormant'; }
   flinches() { return false; }
+  armored() { return true; }
   edgeAhead() { return false; }
   speedMul() { return 1; }
 
@@ -38,6 +39,7 @@ export class Asgmor extends Mob {
   takeDamage(dmg, posture, dir, info) {
     if (this.state === 'dormant' || this.state === 'intro' || this.state === 'phaseShift') return 'none';
     const r = super.takeDamage(dmg, posture, dir, info);
+    if (!this.dead && this.state === 'recover' && this.hits >= (this.phase === 2 ? 4 : 5)) { this.hits = 0; this.set('fanHop'); }
     if (!this.dead && this.phase === 1 && this.hp <= this.def.hp / 2) {
       this.phase = 2; this.set('phaseShift'); this.vx = 0; sfx.roar();
       this.world.banner = { text: 'O Louco ri entre as cinzas', sub: 'Asgmor acelera', t: 0, dur: 2.2, small: true };
