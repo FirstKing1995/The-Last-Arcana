@@ -1,6 +1,5 @@
 // Errante, Asgmor e carregamento da arte.
 // O Errante é renderizado do modelo 3D (tools/errante3d.py) em pixel art: corpo numa folha e uma folha por arma.
-import { SPRITES } from './spritemeta.js';
 import { HEROI } from './heroimeta.js';
 import { CENA } from './cenameta.js';
 import { S, r2, canvas } from './hd.js';
@@ -8,7 +7,7 @@ import { S, r2, canvas } from './hd.js';
 export const img = {};
 const LIST = {
   h_errante: 'sprites/h_errante.png', h_fio: 'sprites/h_fio.png', h_lanca: 'sprites/h_lanca.png', h_machado: 'sprites/h_machado.png', h_agulhas: 'sprites/h_agulhas.png', h_ruptura: 'sprites/h_ruptura.png',
-  asgmor: 'sprites/asgmor.png', atlas: 'cena/atlas.png', ceu: 'cena/ceu.webp', torres: 'cena/torres.webp', ruinas: 'cena/ruinas.webp', parede: 'cena/parede.webp', rocha: 'cena/rocha.webp', capa: 'cena/capa.webp',
+  atlas: 'cena/atlas.png', ceu: 'cena/ceu.webp', torres: 'cena/torres.webp', ruinas: 'cena/ruinas.webp', parede: 'cena/parede.webp', rocha: 'cena/rocha.webp', capa: 'cena/capa.webp',
 };
 let done = 0;
 export const progress = { f: 0 };
@@ -41,7 +40,7 @@ export const has = (n) => !!CENA[n];
 export const size = (n) => (CENA[n] ? [CENA[n][2] / S, CENA[n][3] / S] : [0, 0]);
 
 // ---------- buffers para clarão, contorno e luz de borda ----------
-const BW = 340, BH = 260, OX = 170, OY = 210;
+const BW = 420, BH = 280, OX = 210, OY = 230;
 const [buf, b] = canvas(BW, BH);
 const [sil, s] = canvas(BW, BH);
 function tint(color) {
@@ -109,28 +108,30 @@ export function drawErrante(ctx, p, sx, sy, time, alphaMul = 1, outlineCol) {
   }
 }
 
-// ---------- Asgmor ----------
-const A = SPRITES.asgmor;
-const A_STATE = {
-  intro: 'roar', phaseShift: 'roar', leapWind: 'crouch', rollWind: 'crouch', bellSway: 'sway', dragWind: 'dragwind', drag: 'drag',
-  fanWind: 'fan', roll: 'roll', broken: 'broken', recoil: 'broken', dormant: 'broken',
+// ---------- Asgmor: 16 poses feitas a partir da arte do Pedro, com peso, esticada e giro por código ----------
+const A_POSE = {
+  dormant: 0, recover: 0, recoil: 7, broken: 7, leapWind: 3, rollWind: 3, bellSway: 6, fanHop: 4, fanWind: 12, dragWind: 8, drag: 9, swipeWind: 3, swipe: 11, swingWind: 8, swing: 10, roll: 13, intro: 14, phaseShift: 14,
 };
 export function drawAsgmor(ctx, m, sx, sy, time) {
-  if (m.dead && m.deathT > 2.5) return;
+  if (m.dead && m.deathT > 3) return;
   const st = m.state, tel = m.telegraph();
-  const alpha = m.dead ? Math.max(0, 1 - m.deathT / 2.5) : m.isEcho ? 0.8 : 1;
-  let anim = A_STATE[st] || 'idle';
-  if ((st === 'leap' || st === 'fanHop') && !m.onGround) anim = m.vy < 0 ? 'leap' : 'fall';
-  else if (st === 'leap') anim = 'land';
-  if (m.dead) anim = 'broken';
-  const M = A.anims[anim], i = M.i + (st === 'dormant' ? 0 : Math.floor(time * M.fps) % M.n);
-  b.clearRect(0, 0, BW, BH);
-  b.drawImage(img.asgmor, (i % A.cols) * A.fw, Math.floor(i / A.cols) * A.fh, A.fw, A.fh, OX - A.bx, OY - A.by, A.fw, A.fh);
-  // esticar e achatar: saltos e quedas ganham peso
-  let sqx = 1, sqy = 1;
-  if (!m.onGround) { const v = Math.min(0.16, Math.abs(m.vy) / 2600); sqx = 1 - v * 0.7; sqy = 1 + v; } else if (st === 'bellSway' && m.t < 0.18) { const k = 1 - m.t / 0.18; sqx = 1 + 0.16 * k; sqy = 1 - 0.16 * k; } else if (st === 'leapWind' || st === 'rollWind') { const k = Math.min(1, m.t * 3); sqx = 1 + 0.05 * k; sqy = 1 - 0.07 * k; }
-  if (st === 'drag') { sqx = 1.06; }
-  put(ctx, sx, sy, m.facing, { flash: m.flash > 0, alpha, sx: sqx, sy: sqy, rim: st === 'bellSway' && Math.sin(m.t * 30) > 0 ? '#d06a30' : m.isEcho ? '#8a7a66' : null });
+  const alpha = m.dead ? Math.max(0, Math.min(1, (3 - m.deathT) / 1.2)) : m.isEcho ? 0.8 : 1;
+  let n = A_POSE[st], sqx = 1, sqy = 1, rot = 0, oy = 0, ox = 0;
+  if (n === undefined) n = Math.abs(m.vx) > 12 ? [1, 2][Math.floor(time * (m.phase === 2 ? 6.5 : 5)) % 2] : 0;
+  if (st === 'leap') n = m.onGround ? 6 : m.vy < 40 ? 4 : 5;
+  if (st === 'fanHop' && m.onGround && m.t > 0.1) n = 3;
+  if (st === 'bellSway') { if (m.t > 0.45) n = 6; if (m.t < 0.2) { const k = 1 - m.t / 0.2; sqx = 1 + 0.2 * k; sqy = 1 - 0.2 * k; } else ox = Math.sin(time * 60) * 0.7; }
+  if (m.dead) n = 15;
+  if (!m.onGround && st !== 'roll') { const v = Math.min(0.12, Math.abs(m.vy) / 3200); sqx = 1 - v * 0.7; sqy = 1 + v; }
+  if (/Wind$/.test(st)) { const k = Math.min(1, m.t * 3.2); sqx = 1 + 0.05 * k; sqy = 1 - 0.06 * k; ox = Math.sin(time * 64) * 0.6 * k; }
+  if (st === 'drag' || st === 'swipe') { sqx = 1.06; sqy = 0.97; }
+  if ((n === 1 || n === 2)) oy = -Math.abs(Math.sin(time * 10)) * 1.2;
+  if (n === 0 && st !== 'dormant') { const b = Math.sin(time * 4); sqy = 1 + 0.015 * b; sqx = 1 - 0.01 * b; }
+  if (m.hitT > 0 && !m.armoredNow) ox += m.hitDir * m.hitT * 8;
+  if (st === 'roll') {
+    const [, , w, h] = CENA.m_asg_13; ctx.save(); ctx.translate(r2(sx), r2(sy - h / S / 2)); ctx.rotate(m.facing * time * 16);
+    ctx.drawImage(img.atlas, CENA.m_asg_13[0], CENA.m_asg_13[1], w, h, -w / S / 2, -h / S / 2, w / S, h / S); ctx.restore();
+  } else creature(ctx, 'm_asg_' + n, sx + ox, sy + oy, m.facing, { flash: m.flash > 0, alpha, sx: sqx, sy: sqy, rot, rim: st === 'bellSway' && Math.sin(m.t * 30) > 0 ? '#d06a30' : m.phase === 2 && Math.sin(time * 7) > 0.2 ? '#a83020' : m.isEcho ? '#8a7a66' : null });
 
   if (tel && Math.sin(time * 26) > -0.2) {
     const col = tel === 'parry' ? '#ffd23a' : '#ff4a3a';

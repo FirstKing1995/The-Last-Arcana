@@ -1,6 +1,7 @@
 // Criaturas, NPCs e fauna: arte própria (arte/ia) com quadros-chave e movimento extra por código (peso, balanço, estica e achata).
-import { drawErrante, creature, piece } from './art.js';
-import { r2 } from './hd.js';
+import { drawErrante, creature, piece, img } from './art.js';
+import { CENA } from './cenameta.js';
+import { r2, S } from './hd.js';
 
 const cyc = (a, t, fps) => a[Math.floor(t * fps) % a.length];
 // estado do mob -> quadro da folha
@@ -10,14 +11,15 @@ function pose(m, time) {
   switch (m.type) {
     case 'cinzeiro':
       if (s === 'broken' || s === 'recoil') return 6;
-      if (s === 'windup') return 4;
+      if (s === 'windup' || s === 'spitWind') return 4;
       if (s === 'hop') return 6;
       if (s === 'strike') return 5;
       return mv ? cyc([1, 2, 3, 2], t, 11) : 0;
     case 'braseiro':
       if (s === 'broken' || s === 'recoil') return 7;
       if (s === 'guard') return 3;
-      if (s === 'slashWind') return 4;
+      if (s === 'slashWind' || s === 'slamWind') return 4;
+      if (s === 'slam') return 5;
       if (s === 'lungeWind') return m.t < 0.25 ? 0 : 4;
       if (s === 'slash' || (s === 'recover' && m.t < 0.12 && m.t >= 0)) return 5;
       if (s === 'lunge') return 6;
@@ -26,7 +28,8 @@ function pose(m, time) {
       if (s === 'broken' || s === 'recoil') return 6;
       if (s === 'windup') return 4;
       if (s === 'back') return 6;
-      if (s === 'bite') return 5;
+      if (s === 'bite' || s === 'erupt') return 5;
+      if (s === 'eruptWind') return 4;
       return mv ? cyc([1, 2, 3, 2], t, 12) : 0;
     case 'gralha':
       if (s === 'broken' || s === 'grounded') return 6;
@@ -44,18 +47,19 @@ function pose(m, time) {
 
 export function drawMob(ctx, m, sx, sy, time) {
   if (m.dead && m.deathT > 0.7) return;
+  if (m.state === 'dig') { ctx.globalAlpha = 0.5 + Math.sin(time * 20) * 0.2; ctx.fillStyle = '#ff8a3a'; ctx.fillRect(r2(sx) - 8, r2(sy) - 1, 16, 1); ctx.globalAlpha = 1; return; }
   const key = m.type === 'sinoElite' ? 'sino' : m.type, st = m.state;
   const warn = st.endsWith('Wind') || st === 'windup' || st === 'wind';
-  const i = pose(m, time), big = m.type === 'sinoElite' ? 1.24 : 1;
+  const i = pose(m, time), big = m.type === 'sinoElite' ? 1.24 : m.hard ? 1.16 : 1;
   let kx = big, ky = big, rot = 0, ox = 0, oy = 0;
   if (m.dead) { const k = m.deathT / 0.7; ky *= 1 - k * 0.25; } else if (warn) { const k = Math.min(1, m.t * 4); kx *= 1 + 0.05 * k; ky *= 1 - 0.06 * k; ox = Math.sin(time * 70) * 0.6 * k; } else if (st === 'strike' || st === 'lunge' || st === 'bite' || st === 'slash') { kx *= 1.1; ky *= 0.95; } else if (m.type !== 'gralha' && Math.abs(m.vx) < 8 && key !== 'sino') { const b = Math.sin(time * 3 + m.spawnX); ky *= 1 + 0.02 * b; kx *= 1 - 0.012 * b; }
   if (m.hitT > 0) { const k = m.hitT / 0.16; rot = -m.hitDir * 0.14 * k; ox += m.hitDir * 3 * k; kx *= 1 - 0.08 * k; ky *= 1 + 0.05 * k; }
   if (key === 'gralha' && !m.dead) { rot = Math.max(-0.3, Math.min(0.3, m.vy * 0.002)) * m.facing; if (st === 'hover' || st === 'idle') oy = Math.sin(time * 5 + m.spawnX) * 2; }
   if (key === 'sino' && !m.dead) rot += (st === 'wind' ? Math.sin(time * 30) * 0.05 : Math.sin(time * 2 + m.spawnX) * 0.02);
-  creature(ctx, `m_${key}_${i}`, sx + ox, sy + oy, m.facing, { flash: m.flash > 0, alpha: m.dead ? 1 - m.deathT / 0.7 : 1, sx: kx, sy: ky, rot, rim: warn && Math.sin(time * 34) > 0 ? '#ffb040' : null });
+  creature(ctx, `m_${key}_${i}`, sx + ox, sy + oy, m.facing, { flash: m.flash > 0, alpha: m.dead ? 1 - m.deathT / 0.7 : 1, sx: kx, sy: ky, rot, rim: warn && Math.sin(time * 34) > 0 ? '#ffb040' : null, outline: m.hard && !m.dead ? (Math.sin(time * 5 + m.spawnX) > 0 ? '#e03038' : '#8a1a24') : null });
   // aviso com forma, além da cor: losango amarelo = dá para aparar; triângulo vermelho = só evitar
   if (warn && Math.sin(time * 24) > -0.4) {
-    const x = r2(sx), y = r2(sy - m.h - 14 - (key === 'gralha' ? 10 : 0)), red = key === 'sino' || st === 'shotWind';
+    const x = r2(sx), y = r2(sy - m.h - 14 - (key === 'gralha' ? 10 : 0)), red = key === 'sino' || st === 'shotWind' || st === 'spitWind' || st === 'slamWind';
     ctx.fillStyle = '#0a090c'; ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.fill();
     ctx.fillStyle = red ? '#ff4a3a' : '#ffd23a'; ctx.beginPath();
     if (red) { ctx.moveTo(x, y - 3.5); ctx.lineTo(x + 3.5, y + 2.5); ctx.lineTo(x - 3.5, y + 2.5); } else { ctx.moveTo(x, y - 3.5); ctx.lineTo(x + 3.5, y); ctx.lineTo(x, y + 3.5); ctx.lineTo(x - 3.5, y); }
@@ -77,14 +81,22 @@ export function brokenMark(ctx, x, y, time) {
   ctx.restore();
 }
 
-// ---------- NPCs ----------
-function npc(ctx, n, sx, sy, time, fps, flip, seq) {
-  const i = seq ? seq[Math.floor(time * fps) % seq.length] : 0, b = Math.sin(time * 2.2 + sx * 0.01);
-  piece(ctx, `m_${n}_${i}`, sx, sy, { flip, sy: 1 + 0.012 * b, sx: 1 - 0.008 * b });
+// ---------- NPCs: parados de verdade. Só a respiração (meio pixel no tronco), o cabelo da luz e, na Ysara, a marteladas ----------
+function breathe(ctx, name, x, y, flip, time, cut) {
+  const [sx, sy, w, h, ox, oy] = CENA[name], k = 1 / S, up = Math.sin(time * 1.7) > 0.35 ? 0.5 : 0;
+  ctx.save(); ctx.translate(r2(x), r2(y)); if (flip) ctx.scale(-1, 1);
+  // pernas paradas; do corte para cima sobe meio pixel ao inspirar
+  ctx.drawImage(img.atlas, sx, sy + cut, w, h - cut, ox * k, (oy + cut) * k, w * k, (h - cut) * k);
+  ctx.drawImage(img.atlas, sx, sy, w, cut + (up ? 1 : 0), ox * k, oy * k - up, w * k, (cut + (up ? 1 : 0)) * k);
+  ctx.restore();
 }
-export function drawNPC(ctx, sx, sy, time) { npc(ctx, 'elion', sx, sy, time, 2, true, [0, 1, 2, 3]); }
-export function drawMorren(ctx, sx, sy, time) { npc(ctx, 'morren', sx, sy, time, 2, true, [0, 1, 2, 3]); }
-export function drawYsara(ctx, sx, sy, time) { npc(ctx, 'ysara', sx, sy, time, 4, false, [0, 1, 1, 2, 3, 3]); }
+export function drawNPC(ctx, sx, sy, time) { breathe(ctx, 'm_elion_0', sx, sy, true, time, 44); }
+export function drawMorren(ctx, sx, sy, time) { breathe(ctx, 'm_morren_0', sx, sy, true, time + 1.3, 50); }
+export function drawYsara(ctx, sx, sy, time) {
+  // ciclo de 2,4 s: prepara, bate três vezes, descansa
+  const t = time % 2.4, hit = t < 1.5 && (t % 0.5) > 0.3;
+  if (hit) piece(ctx, 'm_ysara_3', sx, sy, {}); else breathe(ctx, 'm_ysara_0', sx, sy, false, time + 0.6, 40);
+}
 
 // ---------- fauna neutra: rato-de-brasa, lagarto de fuligem, gralha cinzenta ----------
 export function drawFauna(ctx, f, sx, sy, time) {

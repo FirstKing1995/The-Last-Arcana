@@ -77,6 +77,7 @@ export class Level {
     this.ground(94, 102, 48); this.fill(107, 112, G, G + 1, '.');
     this.spawn('cinzeiro', 89, G, { patrol: this.patrol(86, 92) });
     this.spawn('cinzeiro', 110, G + 2, { patrol: this.patrol(108, 111) });
+    this.spawn('cinzeiro', 98, 48); this.spawn('gralha', 103, G); this.spawn('cinzeiro', 116, G);
     this.prop('fallenbell', 84, G); this.prop('fallenbell', 99, 48); this.prop('bellpost', 115, G); this.prop('column', 105, G, { broken: 1 }); this.prop('deadtree', 91, G);
     this.spawn('herb', 97, 48, { id: 'flor2', herb: 'flor' }); this.spawn('pot', 101, 48, { id: 'v4' });
 
@@ -86,6 +87,7 @@ export class Level {
     this.prop('torch', 130, 46); this.prop('torch', 146, 46);
     this.prop('janela', 132, 47); this.prop('janela', 140, 47); this.prop('estandarte', 136, 46); this.prop('ossos', 128, G);
     this.spawn('braseiro', 138, G, { patrol: this.patrol(134, 142) });
+    this.spawn('cinzeiro', 130, G); this.spawn('rasteja', 148, G);
     this.spawn('crate', 124, G, { id: 'v5' }); this.spawn('pot', 151, G, { id: 'v9' });
     this.spawn('herb', 145, G, { id: 'sal1', herb: 'salvia' });
 
@@ -93,6 +95,7 @@ export class Level {
     // B05 Ruínas: bifurcação (telhados acima, poço abaixo, torre fechada à frente)
     this.prop('column', 157, G, { broken: 1 }); this.prop('bellpost', 173, G); this.prop('deadtree', 179, G, { v: 1 });
     this.spawn('cinzeiro', 170, G, { patrol: this.patrol(166, 176) });
+    this.spawn('braseiro', 178, G, { patrol: this.patrol(174, 181) }); this.spawn('gralha', 168, G);
     this.fill(190, 199, 10, G - 1, '#');                  // muralha do campanário: não se escala
     this.carve(190, 199, 46, 49); this.fill(191, 191, 46, 49, 'H'); // portão do atalho permanente
     this.spawn('sign', 188, G, { id: 'portao' });
@@ -107,12 +110,14 @@ export class Level {
     this.spawn('chest', 184, 27, { id: 'mirante', reward: 'coins', amount: 120 });
     this.spawn('cinzeiro', 178, 41, { patrol: this.patrol(175, 180) });
     this.spawn('gralha', 171, 32);
+    this.spawn('braseiro', 168, 32, { elite: 1 }); this.spawn('gralha', 174, 32);
     // B07 Poço de Serviço: a entrada real, sob as tábuas
     this.carve(183, 187, G, 77); this.plat(183, 187, G); this.plat(184, 186, 52); this.shaftPlats(183, 187, 54, 76);
     this.prop('wellframe', 185, G);
     // B08 Caverna de Cinza: corredor baixo com Rasteja-Fumaça
     this.carve(150, 187, 72, 77); this.shaftPlats(183, 187, 72, 76); this.fill(158, 167, 72, 74, '#');
     this.spawn('rasteja', 172, 78); this.spawn('rasteja', 154, 78);
+    this.spawn('cinzeiro', 176, 78); this.spawn('rasteja', 163, 78, { elite: 1 });
     this.prop('torch', 178, 74); this.prop('torch', 152, 74); this.prop('gaiola', 170, 75); this.prop('ossos', 156, 78);
     this.spawn('herb', 163, 78, { id: 'liq2', herb: 'liquen' });
     // B09 Passagem Baixa: o caminho sobe pela plataforma; o segredo fica sob ela (deslize)
@@ -122,12 +127,14 @@ export class Level {
     this.spawn('chest', 121, 78, { id: 'passagem', reward: 'weapon', weapon: 'agulhas', coins: 60 });
     this.prop('crack', 129, 78);
     this.spawn('cinzeiro', 141, 78, { patrol: this.patrol(138, 146) });
-    this.spawn('cinzeiro', 123, 70); this.prop('torch', 147, 73); this.prop('torch', 115, 70); this.prop('janela', 143, 74); this.prop('estatua', 146, 78);
+    this.spawn('cinzeiro', 123, 70); this.prop('torch', 147, 73); this.prop('torch', 115, 70);
+    this.spawn('braseiro', 145, 78, { patrol: this.patrol(138, 147) }); this.spawn('cinzeiro', 115, 78); this.prop('janela', 143, 74); this.prop('estatua', 146, 78);
 
     // ================= SETOR C: complexo interno =================
     // C10 Cripta de Serviço
     this.carve(84, 111, 68, 77); this.fill(111, 111, 68, 72, '#');
     this.spawn('braseiro', 100, 78, { patrol: this.patrol(96, 105) }); this.spawn('cinzeiro', 93, 78);
+    this.spawn('braseiro', 106, 78); this.spawn('cinzeiro', 98, 78);
     this.spawn('pot', 108, 78, { id: 'v10' }); this.spawn('crate', 104, 78, { id: 'v11' });
     for (const x of [90, 106]) this.prop('torch', x, 73);
     for (const x of [94, 98, 102]) this.prop('coffin', x, 78);
@@ -138,6 +145,7 @@ export class Level {
     this.fill(98, 99, 89, 93, '#'); this.fill(112, 113, 88, 93, '#');
     this.plat(94, 96, 91); this.plat(102, 105, 90); this.plat(107, 110, 90); this.plat(115, 118, 91);
     this.spawn('rasteja', 92, 94); this.spawn('gralha', 106, 94); this.spawn('cinzeiro', 122, 94, { patrol: this.patrol(118, 127) });
+    this.spawn('braseiro', 126, 94, { elite: 1 }); this.spawn('rasteja', 110, 94); this.spawn('gralha', 120, 94);
     this.spawn('herb', 104, 94, { id: 'sal2', herb: 'salvia' }); this.prop('torch', 101, 86); this.prop('torch', 121, 87); this.prop('ossos', 126, 94); this.prop('gaiola', 106, 88); this.prop('estatua', 92, 94);
     // C12 Mecanismo dos Sinos: duas alavancas de sino abrem a comporta (sem item, sem Arcano)
     this.carve(131, 166, 82, 93); this.fill(130, 130, 84, 89, '#');
@@ -145,16 +153,19 @@ export class Level {
     this.plat(139, 142, 91); this.plat(144, 147, 88); this.plat(150, 153, 87); this.plat(156, 159, 84);
     this.spawn('lever', 146, 88, { id: 'mec1' }); this.spawn('lever', 158, 84, { id: 'mec2' });
     this.prop('engrenagem', 151, 92, { scale: 1.2 }); this.prop('janela', 140, 90); this.prop('janela', 161, 90); this.spawn('braseiro', 161, 94, { patrol: this.patrol(155, 163) });
+    this.spawn('cinzeiro', 152, 94); this.spawn('gralha', 148, 94); this.spawn('cinzeiro', 158, 94);
     this.fill(167, 167, 82, 89, '#'); this.fill(167, 167, 90, 93, 'M');
     this.spawn('sign', 165, 94, { id: 'comporta' });
     // C13 Cisterna de Fuligem: por cima, rota segura; no fundo, risco e recompensa
     this.carve(168, 206, 84, 97); this.fill(168, 173, 94, 97, '#'); this.fill(200, 206, 94, 97, '#');
     this.plat(176, 179, 93); this.plat(183, 186, 92); this.plat(190, 193, 92); this.plat(196, 198, 93); this.plat(174, 175, 96); this.plat(198, 199, 96);
     this.spawn('rasteja', 181, 98); this.spawn('cinzeiro', 189, 98); this.spawn('gralha', 188, 98);
+    this.spawn('rasteja', 186, 98, { elite: 1 }); this.spawn('cinzeiro', 192, 98); this.spawn('gralha', 180, 98); this.spawn('braseiro', 203, 94);
     this.spawn('chest', 194, 98, { id: 'fosso', reward: 'coins', amount: 160 });
     this.spawn('herb', 178, 98, { id: 'liq3', herb: 'liquen' }); this.prop('torch', 171, 89); this.prop('torch', 203, 89); this.prop('janela', 187, 90); this.prop('ossos', 184, 98);
     // C14 Galeria das Correntes: subida de volta à luz
     this.carve(207, 232, 82, 93); this.spawn('braseiro', 216, 94, { patrol: this.patrol(212, 221) });
+    this.spawn('braseiro', 223, 94, { elite: 1 }); this.spawn('cinzeiro', 211, 94); this.spawn('gralha', 218, 94);
     this.carve(226, 231, G, 81); this.plat(226, 231, G); this.shaftPlats(226, 231, 53, 92);
     for (const x of [210, 219]) this.prop('gaiola', x, 87 + (x % 2));
     this.prop('sinao', 214, 90); this.prop('estandarte', 224, 88);
@@ -164,6 +175,7 @@ export class Level {
     // D15 Pátio do Sino-Fendido (especialista) e o portão do atalho
     this.spawn('lever', 202, G, { id: 'portao' });
     this.spawn('sino', 214, G); this.spawn('cinzeiro', 208, G); this.spawn('gralha', 221, G);
+    this.spawn('rasteja', 222, G); this.spawn('braseiro', 229, G);
     this.prop('fallenbell', 206, G); this.prop('column', 224, G, { broken: 1 }); this.prop('estatua', 231, G); this.prop('ossos', 211, G); this.prop('bellpost', 234, G);
     this.spawn('herb', 218, G, { id: 'flor3', herb: 'flor' });
     // D16 Subida Externa Quebrada
@@ -171,6 +183,7 @@ export class Level {
     this.plat(240, 244, 47); this.fill(248, 253, 44, 45, '#'); this.plat(256, 259, 41); this.plat(250, 253, 38);
     this.fill(241, 246, 35, 36, '#'); this.plat(248, 251, 32); this.plat(254, 257, 29); this.fill(259, 262, 26, 27, '#'); this.plat(257, 260, 23);
     this.spawn('gralha', 251, 38); this.spawn('gralha', 249, 32); this.spawn('cinzeiro', 244, 35);
+    this.spawn('cinzeiro', 250, 44); this.spawn('gralha', 252, 44, { elite: 1 });
     // D17 Escadaria: sem inimigos, com o marco de retorno
     this.prop('column', 268, TOP); this.prop('column', 278, TOP, { broken: 1 }); this.prop('bellpost', 273, TOP);
     this.spawn('shrine', 284, TOP, { id: 'campanario', name: 'Pira do Campanário' });

@@ -1,5 +1,5 @@
 import { moveBody, overlap, GRAVITY, TILE } from './physics.js';
-import { MOBS } from './data.js';
+import { MOBS, ELITE } from './data.js';
 import { sfx } from './audio.js';
 import { Projectile, Shockwave, AshPatch } from './fx.js';
 
@@ -7,6 +7,8 @@ import { Projectile, Shockwave, AshPatch } from './fx.js';
 export class Mob {
   constructor(world, type, x, y, opts = {}) {
     this.world = world; this.type = type; this.def = MOBS[type];
+    this.hard = !!opts.elite;
+    if (this.hard) { const d = this.def; this.def = { ...d, name: d.name + ' Endurecido', hp: Math.round(d.hp * ELITE.hp), dmg: Math.round(d.dmg * ELITE.dmg), posture: Math.round(d.posture * ELITE.posture), speed: d.speed * 1.15, coins: d.coins * ELITE.coins, w: Math.round(d.w * 1.15), h: Math.round(d.h * 1.15) }; }
     this.w = this.def.w; this.h = this.def.h;
     this.spawnX = x; this.spawnY = y;
     this.summoned = !!opts.summoned;
@@ -26,11 +28,15 @@ export class Mob {
   cy() { return this.y + this.h / 2; }
   box() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
   hurtbox() { return this.box(); }
-  set(s) { this.state = s; this.t = 0; this.hitDone = false; }
+  // No máximo três inimigos armam golpe ao mesmo tempo: grupo difícil, mas dá para ler
+  busy() { return /wind|strike|slash|lunge|bite|dive|erupt|slam/i.test(this.state); }
+  set(s) {
+    if (/windup|Wind$|^dig$/.test(s) && !this.busy() && !this.isElite && this.world.mobs) { let n = 0; for (const m of this.world.mobs) if (m !== this && !m.dead && m.aggro && m.busy() && Math.abs(m.cx() - this.cx()) < 260) n++; if (n >= 3) return; }
+    this.state = s; this.t = 0; this.hitDone = false; }
   isBroken() { return this.state === 'broken'; }
   endBreak() { if (this.state === 'broken') this.set('recover'); this.posture = 0; }
   // Em preparação ou no golpe o inimigo não é empurrado: bater sem olhar sai caro
-  armored() { return ['windup', 'strike', 'slashWind', 'slash', 'lungeWind', 'lunge', 'bite', 'wind'].includes(this.state); }
+  armored() { return this.hard || ['windup', 'strike', 'spitWind', 'slashWind', 'slash', 'slamWind', 'slam', 'lungeWind', 'lunge', 'bite', 'wind', 'dig', 'eruptWind', 'erupt'].includes(this.state); }
   // Reação ao ataque do Errante: cada tipo tem a sua (recuo, guarda, flanco). Devolve true se reagiu.
   reflex(dt, chance) {
     if (this.reflexCd > 0) { this.reflexCd -= dt; return false; }
@@ -122,14 +128,14 @@ export class Mob {
     const dx = tgt.x - this.cx(), dy = p.cy() - this.cy();
     this.dx = dx; this.dist = Math.abs(dx);
     const pdx = p.cx() - this.cx();
-    if (!this.aggro && !p.dead && Math.abs(pdx) < (this.aggroRange || 150) && Math.abs(dy) < 70) {
+    if (!this.aggro && !p.dead && Math.abs(pdx) < (this.aggroRange || 150) * 1.35 && Math.abs(dy) < 80) {
       this.aggro = true;
       // Alerta: chama aliados próximos uma única vez
       if (!this.alerted) { this.alerted = true; w.alertNear(this); }
       this.onAggro && this.onAggro();
     }
     // Território: caçadores voltam depois de uma curta perseguição
-    if (this.aggro && (Math.abs(this.cx() - this.spawnX) > 260 || Math.abs(dy) > 150 || p.dead)) this.aggro = false;
+    if (this.aggro && (Math.abs(this.cx() - this.spawnX) > 420 || Math.abs(dy) > 150 || p.dead)) this.aggro = false;
     if (this.state === 'broken') {
       this.vx *= 0.9;
       if (this.t > 2.2) { this.set('recover'); this.posture = 0; }
@@ -179,9 +185,12 @@ export class Mob {
 
   update(dt) {
     if (this.dead) { this.deathT += dt; return; }
-    if (this.common(dt * 1.18)) this.think(dt * 1.18);
+    const k = this.hard ? 1.3 : 1.2;
+    if (this.common(dt * k)) this.think(dt * k);
     this.physics(dt);
   }
+  // vê o Errante beber: hora de atacar
+  sawDrink() { const p = this.world.player; return p.action === 'heal' && p.t < 0.3 && this.dist < 170; }
 }
 
 // Bucha de canhão — avança em linha reta, ataca uma vez e recua.
@@ -189,7 +198,14 @@ export class Cinzeiro extends Mob {
   constructor(...a) { super(...a); this.bloodColor = '#d56a32'; this.aggroRange = 140; }
   flinches() { return true; }
   evade() { if (!this.edgeAhead(-this.facing)) { this.vx = -this.facing * 190; this.vy = -130; this.set('hop'); } }
-  revide() { this.facing = Math.sign(this.dx) || this.facing; this.set('windup'); this.delay = 0.3; }
+  revide() { this.facing = Math.sign(this.dx) || this.facing; this.set('windup'); this.delay = 0.26; }
+  // o corpo de carvão estoura pouco depois de cair: não fique em cima
+  die() { super.die(); const gy = this.world.level.groundBelow(this.cx(), this.y); if (!this.summoned || Math.random() < 0.5) this.world.fx.add(new AshPatch(this.cx(), gy, 0.85, this.hard ? 34 : 26, Math.round(this.def.dmg * 0.8))); }
+  spit() {
+    const p = this.world.player, n = this.hard ? 3 : 1;
+    for (let i = 0; i < n; i++) { const t = 0.62, tx = p.cx() + p.vx * 0.3 + (i - (n - 1) / 2) * 34; this.world.fx.add(new Projectile({ owner: 'enemy', x: this.cx(), y: this.y + 4, vx: (tx - this.cx()) / t, vy: (p.cy() - this.y - 4) / t - 0.5 * 520 * t, grav: 520, r: 3, dmg: Math.round(this.def.dmg * 0.75), color: '#ff8a3a', glow: '#ffb060', life: 2, onLand: (w, x, y) => w.fx.add(new AshPatch(x, y, 0.7, 16, Math.round(this.def.dmg * 0.6))) })); }
+    sfx.fire();
+  }
   think(dt) {
     const s = this.state, D = this.def;
     if (!this.aggro) return this.returnHome(dt);
@@ -198,15 +214,20 @@ export class Cinzeiro extends Mob {
     if (s === 'idle' || s === 'recover') {
       if (s === 'recover' && this.t < 0.4) { this.vx *= 0.85; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 72) { this.set('windup'); this.vx = 0; this.delay = 0.32 + Math.random() * 0.22; }
+      if (this.dist > 90 && this.dist < 210 && Math.random() < 0.012 + (this.sawDrink() ? 0.1 : 0)) { this.set('spitWind'); this.vx = 0; }
+      else if (this.dist < 82) { this.set('windup'); this.vx = 0; this.delay = 0.28 + Math.random() * 0.24; }
       else this.walkToward(this.facing, D.speed);
+    } else if (s === 'spitWind') {
+      this.vx = 0; this.facing = Math.sign(this.dx) || this.facing;
+      if (this.t > 0.5) { this.spit(); this.set('recover'); }
     } else if (s === 'windup') {
       this.vx = 0;
-      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('strike'); this.vx = this.facing * 340; this.vy = -80; sfx.swing(); }
+      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('strike'); this.vx = this.facing * 370; this.vy = -80; sfx.swing(); }
     } else if (s === 'strike') {
       this.vx *= 0.955;
       this.melee(this.front(16), D.dmg, { parryable: true });
-      if (this.t > 0.24) this.set('retreat');
+      // às vezes emenda outro bote em vez de recuar
+      if (this.t > 0.24) { if (!this.again && Math.random() < (this.hard ? 0.6 : 0.35)) { this.again = true; this.set('windup'); this.delay = 0.22; } else { this.again = false; this.set('retreat'); } }
     } else if (s === 'retreat') {
       this.vx = -this.facing * 75;
       if (this.edgeAhead(-this.facing)) this.vx = 0;
@@ -232,8 +253,10 @@ export class Braseiro extends Mob {
       const r = Math.random();
       if (this.dist < 62) {
         this.vx = 0; this.delay = 0.34 + Math.random() * 0.24;
-        if (r < 0.62) this.set('slashWind'); else if (r < 0.78) { this.set('guard'); this.delay = 0.7; } else this.set('lungeWind');
-      } else if (this.dist < 150 && r < 0.03) { this.vx = 0; this.set('lungeWind'); }
+        this.chain = 0;
+        if (this.sawDrink()) this.set('lungeWind');
+        else if (r < 0.52) this.set('slashWind'); else if (r < 0.66) { this.set('guard'); this.delay = 0.6; } else if (r < 0.84) this.set('slamWind'); else this.set('lungeWind');
+      } else if (this.dist < 190 && (r < 0.03 || this.sawDrink())) { this.vx = 0; this.set('lungeWind'); }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'slashWind') {
       this.vx = 0;
@@ -242,10 +265,23 @@ export class Braseiro extends Mob {
       this.vx *= 0.9;
       this.melee(this.front(36, this.h - 4, 2), D.dmg, { parryable: true });
       // às vezes emenda um segundo corte, com atraso: esquivar cedo demais custa
-      if (this.t > 0.18) { if (!this.second && this.dist < 70 && Math.random() < 0.45) { this.second = true; this.set('slashWind'); this.delay = 0.3; } else { this.second = false; this.set('recover'); } }
+      if (this.t > 0.18) { if (this.chain < (this.hard ? 3 : 2) && this.dist < 84 && Math.random() < 0.6) { this.chain++; this.set('slashWind'); this.delay = this.chain === 2 ? 0.42 : 0.24; } else this.set(this.chain > 0 && Math.random() < 0.35 ? 'slamWind' : 'recover'); }
+    } else if (s === 'slamWind') {
+      this.vx = 0; this.facing = Math.sign(this.dx) || this.facing;
+      if (Math.random() < 0.4) this.world.fx.charge(this.cx(), this.y, '#ffb060');
+      if (this.t > 0.62) {
+        this.set('slam'); sfx.explode(); this.world.shake = Math.max(this.world.shake, 5);
+        const gy = this.y + this.h; this.world.fx.shockRing(this.cx() + this.facing * 24, gy);
+        this.melee(this.front(40, this.h + 6, -6), Math.round(this.def.dmg * 1.25), { parryable: false, knock: 1.5 });
+        this.world.fx.add(new Shockwave(this.cx() + this.facing * 24, gy, this.facing, Math.round(this.def.dmg * 0.8), { speed: 190, dist: 190 }));
+        if (this.hard) this.world.fx.add(new Shockwave(this.cx() - this.facing * 16, gy, -this.facing, Math.round(this.def.dmg * 0.8), { speed: 190, dist: 150 }));
+      }
+    } else if (s === 'slam') {
+      this.vx = 0;
+      if (this.t > 0.5) this.set('recover');
     } else if (s === 'lungeWind') {
       this.vx = 0;
-      if (this.t > 0.55) { this.facing = Math.sign(this.dx) || this.facing; this.set('lunge'); sfx.heavy(); }
+      if (this.t > 0.48) { this.facing = Math.sign(this.dx) || this.facing; this.set('lunge'); sfx.heavy(); }
     } else if (s === 'lunge') {
       this.vx = this.facing * 290;
       this.melee(this.front(30, this.h - 4, 2), D.dmg + 20, { parryable: true, knock: 1.4 });
@@ -268,23 +304,34 @@ export class Rasteja extends Mob {
   think(dt) {
     const s = this.state, D = this.def;
     if (!this.aggro) return this.returnHome(dt);
+    if (s === 'dig') {
+      const p = this.world.player, d = p.cx() - this.cx();
+      this.vx = Math.max(-240, Math.min(240, d * 6)); if (this.edgeAhead(Math.sign(this.vx) || 1)) this.vx = 0;
+      if (Math.random() < 0.9) this.world.fx.dust(this.cx(), this.y + this.h, 0, 1);
+      if (this.t > 0.5 && (Math.abs(d) < 10 || this.t > 1.3)) { this.set('eruptWind'); this.vx = 0; }
+      return;
+    }
+    if (s === 'eruptWind') { this.vx = 0; this.world.fx.dust(this.cx(), this.y + this.h, 0, 2); if (this.t > 0.36) { this.set('erupt'); this.vy = -300; sfx.roar(); this.world.fx.shockRing(this.cx(), this.y + this.h); } return; }
+    if (s === 'erupt') { this.melee({ x: this.x - 2, y: this.y - 26, w: this.w + 4, h: this.h + 26 }, Math.round(this.def.dmg * 1.2), { parryable: true, knock: 1.2 }); if (this.t > 0.2 && this.onGround) this.set('recover'); return; }
     if (s === 'flank') { this.vx = this.facing * 320; if (this.t > 0.26 || this.hitWall) { this.facing = -this.facing; this.set('windup'); this.delay = 0.22; this.vx = 0; } return; }
     if (s === 'back') { if (this.t > 0.28) { this.set('windup'); this.delay = 0.24; } return; }
     if (s === 'idle' && this.reflex(dt, 0.5)) return;
     if (s === 'idle' || s === 'recover') {
       if (s === 'recover' && this.t < 0.45) { this.vx *= 0.8; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 84) { this.set('windup'); this.vx = 0; this.delay = 0.28 + Math.random() * 0.16; }
+      if (this.dist > 60 && this.dist < 200 && Math.random() < 0.012 + (this.sawDrink() ? 0.1 : 0)) this.set('dig');
+      else if (this.dist < 94) { this.set('windup'); this.vx = 0; this.delay = 0.24 + Math.random() * 0.18; }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
-      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('bite'); this.vx = this.facing * 360; this.vy = -120; sfx.swing(); }
+      if (this.t > this.delay) { this.facing = Math.sign(this.dx) || this.facing; this.set('bite'); this.vx = this.facing * 390; this.vy = -120; sfx.swing(); }
     } else if (s === 'bite') {
       this.vx *= 0.965;
       this.melee(this.front(12, 11, -1), D.dmg, { parryable: true });
-      if (this.t > 0.28) this.set('recover');
+      if (this.t > 0.28) { if (!this.again && Math.random() < 0.4) { this.again = true; this.set('flank'); } else { this.again = false; this.set('recover'); } }
     }
   }
+  hurtbox() { return this.state === 'dig' ? { x: -999, y: -999, w: 1, h: 1 } : this.box(); }
 }
 
 // Voador — mantém distância, anuncia o disparo e desce em ciclos para ser punido.
@@ -307,7 +354,7 @@ export class Gralha extends Mob {
   }
   update(dt) {
     if (this.dead) { this.deathT += dt; this.y += 60 * dt; return; }
-    if (this.common(dt)) this.think(dt);
+    if (this.common(dt * 1.15)) this.think(dt * 1.15);
     else if (this.state === 'broken') { this.vy = Math.min(this.vy + 400 * dt, 200); if (this.y + this.h >= this.groundY) { this.y = this.groundY - this.h; this.vy = 0; } }
     this.physics(dt);
   }
@@ -325,32 +372,34 @@ export class Gralha extends Mob {
       const tx = p.cx() - this.facing * 84;
       this.vx = Math.max(-this.def.speed, Math.min(this.def.speed, (tx - this.cx()) * 1.5));
       this.vy = (hoverY - this.y) * 2.5;
-      if (this.t > 1.6) {
-        this.cycle++;
-        this.set(this.cycle % 3 === 0 ? 'diveWind' : 'shotWind');
+      if (this.t > (this.hard ? 0.8 : 1.1) || this.sawDrink()) {
+        this.cycle++; this.dives = 0;
+        this.set(this.cycle % 2 === 0 || this.sawDrink() ? 'diveWind' : 'shotWind');
         sfx.caw();
       }
     } else if (s === 'shotWind') {
       this.vx *= 0.9; this.vy *= 0.9;
-      if (this.t > 0.6) {
-        const ang = Math.atan2(p.cy() - this.cy(), p.cx() - this.cx());
-        this.world.fx.add(new Projectile({ owner: 'enemy', x: this.cx(), y: this.cy(), vx: Math.cos(ang) * 140, vy: Math.sin(ang) * 140, r: 3, dmg: this.def.dmg, color: '#3a3a40', glow: '#a65d38', life: 2.5 }));
+      if (this.t > 0.5) {
+        // mira onde o Errante vai estar; três brasas em leque
+        const lead = 0.28, ang = Math.atan2(p.cy() - this.cy(), p.cx() + p.vx * lead - this.cx());
+        for (const d of this.hard ? [-0.34, -0.17, 0, 0.17, 0.34] : [-0.22, 0, 0.22]) this.world.fx.add(new Projectile({ owner: 'enemy', x: this.cx(), y: this.cy(), vx: Math.cos(ang + d) * 190, vy: Math.sin(ang + d) * 190, r: 3, dmg: Math.round(this.def.dmg * 0.75), color: '#ff8a3a', glow: '#ffb060', life: 2.2 }));
         this.set('hover'); this.t = 0.3;
       }
     } else if (s === 'diveWind') {
       this.vx *= 0.85; this.vy = -20;
-      if (this.t > 0.55) { this.set('dive'); this.diveDir = Math.sign(this.dx) || 1; }
+      if (this.t > 0.42) { this.set('dive'); const a = Math.atan2(p.cy() + 6 - this.cy(), p.cx() + p.vx * 0.2 - this.cx()); this.dv = [Math.cos(a) * 340, Math.max(120, Math.sin(a) * 340)]; this.diveDir = Math.sign(this.dx) || 1; }
     } else if (s === 'dive') {
-      this.vx = this.diveDir * 150; this.vy = 230;
-      this.melee(this.box(), this.def.dmg - 20, { parryable: true });
+      this.vx = this.dv[0]; this.vy = this.dv[1];
+      this.melee(this.box(), this.def.dmg, { parryable: true });
       if (this.y + this.h >= this.groundY - 1) { this.y = this.groundY - this.h; this.set('grounded'); this.vx = 0; this.vy = 0; }
-      if (this.t > 1.2) this.set('rise');
+      if (this.t > 0.9) this.set('rise');
     } else if (s === 'grounded') {
       this.vx = 0; this.vy = 0;
-      if (this.t > 1.3) this.set('rise');
+      if (this.t > 0.75) this.set('rise');
     } else if (s === 'rise') {
-      this.vy = -90; this.vx = -this.facing * 30;
-      if (this.y < hoverY) this.set('hover');
+      this.vy = -170; this.vx = -this.facing * 50;
+      // encadeia um segundo mergulho
+      if (this.y < hoverY) { if (this.dives < 1 && Math.random() < 0.5) { this.dives++; this.set('diveWind'); this.t = 0.15; } else this.set('hover'); }
     }
   }
 }
@@ -369,17 +418,20 @@ export class Sino extends Mob {
     if (!this.aggro) return;
     this.facing = Math.sign(this.dx) || this.facing;
     if (s === 'idle' || s === 'recover') {
-      if (this.t > (s === 'recover' ? 1.6 : 1.0)) this.set('wind');
+      if (this.t > (s === 'recover' ? (this.hard ? 0.8 : 1.25) : 0.7)) { this.set('wind'); this.tolls = 0; }
     } else if (s === 'wind') {
-      if (this.t > 0.9) {
+      if (this.t > 0.72) {
         sfx.crackedBell();
         const gy = this.y + this.h;
-        this.world.fx.add(new Shockwave(this.cx() - 12, gy, -1, this.def.dmg, { speed: 150, dist: 200 }));
-        this.world.fx.add(new Shockwave(this.cx() + 12, gy, 1, this.def.dmg, { speed: 150, dist: 200 }));
+        this.world.fx.add(new Shockwave(this.cx() - 22, gy, -1, Math.round(this.def.dmg * 0.7), { speed: 150, dist: 220 }));
+        this.world.fx.add(new Shockwave(this.cx() + 22, gy, 1, Math.round(this.def.dmg * 0.7), { speed: 150, dist: 220 }));
         this.world.shake = Math.max(this.world.shake, 3);
-        if (this.dist < 34) this.world.player.takeHit(this.def.dmg * 0.6, this, { parryable: false, dir: Math.sign(this.dx) || 1, knock: 1.6 });
-        if (!this.summonedOnce && !(this.type === 'sino' && this.world.prog.flags.cryptSilenced)) { this.summonedOnce = true; this.world.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 150, gy); }
-        this.set('recover');
+        if (this.dist < 34) this.world.player.takeHit(this.def.dmg * 0.45, this, { parryable: false, dir: Math.sign(this.dx) || 1, knock: 1.6 });
+        // cinza em volta de quem tenta ficar colado
+        if (this.dist < 70 && this.tolls) for (const d of [-44, 0, 44]) this.world.fx.add(new AshPatch(this.cx() + this.dx * 0.9 + d, gy, 1.0, 16, Math.round(this.def.dmg * 0.5)));
+        if ((this.tolls || 0) < 1 && (this.hard || this.hp < this.def.hp * 0.65)) { this.tolls = 1; this.again2 = true; }
+        if (!this.summonedOnce && !(this.type === 'sino' && this.world.prog.flags.cryptSilenced)) { this.summonedOnce = true; this.world.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 150, gy); if (this.hp < this.def.hp * 0.6) this.world.summon('cinzeiro', this.cx() + Math.sign(this.dx || 1) * 150, gy); }
+        if (this.again2) { this.again2 = false; this.set('wind'); this.t = 0.28; } else this.set('recover');
       }
     }
   }
@@ -395,14 +447,14 @@ export class SinoElite extends Sino {
     this.facing = Math.sign(this.dx) || this.facing;
     const w = this.world;
     if (s === 'idle' || s === 'recover') {
-      if (this.t > (s === 'recover' ? 1.3 : 0.8)) { this.cycle = (this.cycle || 0) + 1; this.set(this.cycle % 3 === 0 ? 'rainWind' : 'wind'); }
+      if (this.t > (s === 'recover' ? 1.0 : 0.7)) { this.cycle = (this.cycle || 0) + 1; this.set(this.cycle % 3 === 0 ? 'rainWind' : 'wind'); }
     } else if (s === 'wind') {
       if (this.t > 0.85) {
         sfx.crackedBell();
         const gy = this.y + this.h;
         this.waves = (this.waves || 0) + 1;
-        w.fx.add(new Shockwave(this.cx() - 14, gy, -1, this.def.dmg, { speed: 160, dist: 230 }));
-        w.fx.add(new Shockwave(this.cx() + 14, gy, 1, this.def.dmg, { speed: 160, dist: 230 }));
+        w.fx.add(new Shockwave(this.cx() - 22, gy, -1, Math.round(this.def.dmg * 0.75), { speed: 160, dist: 230 }));
+        w.fx.add(new Shockwave(this.cx() + 22, gy, 1, Math.round(this.def.dmg * 0.75), { speed: 160, dist: 230 }));
         w.shake = Math.max(w.shake, 3);
         if (!this.summonedOnce) { this.summonedOnce = true; w.summon('cinzeiro', this.cx() - Math.sign(this.dx || 1) * 120, gy); }
         if (this.waves % 2 === 1) { this.set('wind'); this.t = 0.35; } else this.set('recover');
@@ -411,8 +463,8 @@ export class SinoElite extends Sino {
       if (this.t > 1.0) {
         sfx.crackedBell();
         const p = w.player;
-        for (let i = 0; i < 4; i++) {
-          const x = p.cx() + (i - 1.5) * 36;
+        for (let i = 0; i < 6; i++) {
+          const x = p.cx() + (i - 2.5) * 34;
           const gy = w.level.solidGroundBelow(x, p.y);
           w.fx.add(new AshPatch(x, gy, 1.1, 18, 150));
         }

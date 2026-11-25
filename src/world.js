@@ -95,7 +95,7 @@ export class World {
     this.fx.burst(x, y - 10, 10, '#d9b58a', 40, 0.6, 0, 1);
   }
   alertNear(mob) {
-    for (const m of this.mobs) if (m !== mob && !m.dead && !m.aggro && Math.abs(m.cx() - mob.cx()) < 90 && Math.abs(m.cy() - mob.cy()) < 50) m.aggro = true;
+    for (const m of this.mobs) if (m !== mob && !m.dead && !m.aggro && Math.abs(m.cx() - mob.cx()) < 190 && Math.abs(m.cy() - mob.cy()) < 70) m.aggro = true;
   }
 
   // Dicas de contexto: aparecem uma única vez
@@ -182,7 +182,7 @@ export class World {
   }
 
   onMobKilled(m) {
-    const d = MOBS[m.type];
+    const d = MOBS[m.type] && m.def;
     if (!d) return;
     this.addCoins(d.coins || 0, m.cx(), m.y - 6);
     this.addMastery(4, 'kill');

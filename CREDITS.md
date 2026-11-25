@@ -15,6 +15,6 @@
 - **Capa**: gerada no ChatGPT a partir das imagens do Pedro.
 
 ## Restante
-- **Asgmor**: arte de referência do Pedro, recortada e animada para o jogo.
+- **Asgmor**: desenho do Pedro; as 16 poses do jogo foram geradas no Google Gemini a partir da arte dele e montadas por `tools/montar_ia.py`.
 - Efeitos visuais, iluminação, parte dos tiles e os sons de reserva são gerados por código no próprio jogo.
 - O design do mundo, personagens e sistemas vêm do *Manual de Conteúdo, Recompensas e Sistemas* de The Last Arcana.

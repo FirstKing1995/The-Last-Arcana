@@ -87,14 +87,19 @@ export const MATERIALS = {
   cinzaviva: { name: 'Cinza Viva do Louco', desc: 'Material temático de Asgmor.' },
 };
 
-// PV e funções conforme a tabela "Os 115 mobs" — 01. Vale das Cinzas
+// Números do manual (tabela "Os 115 mobs") em `base`. O dono do jogo pediu luta bem mais dura em 25/11:
+// FORCA multiplica vida, postura e dano por cima do manual. Para voltar ao manual, basta pôr tudo em 1.
+export const FORCA = { hp: 1.75, posture: 1.45, dmg: 1.6, boss: 1.45 };
+const mob = (name, role, hp, posture, dmg, o) => ({ name, role, base: { hp, posture, dmg }, hp: Math.round(hp * FORCA.hp), posture: Math.round(posture * FORCA.posture), dmg: Math.round(dmg * FORCA.dmg), ...o });
 export const MOBS = {
-  cinzeiro: { name: 'Cinzeiro Trôpego', role: 'Bucha de canhão', hp: 170, posture: 60, dmg: 110, w: 16, h: 23, speed: 78, coins: 8, drop: 'agulhas' },
-  braseiro: { name: 'Braseiro Oco', role: 'Intermediário', hp: 430, posture: 130, dmg: 165, w: 20, h: 40, speed: 58, coins: 22, drop: 'machado' },
-  rasteja: { name: 'Rasteja-Fumaça', role: 'Rastejador', hp: 250, posture: 60, dmg: 130, w: 30, h: 11, speed: 120, coins: 10, drop: 'agulhas' },
-  gralha: { name: 'Gralha de Fuligem', role: 'Voador', hp: 300, posture: 70, dmg: 120, w: 24, h: 18, speed: 90, coins: 12, drop: 'lanca' },
-  sino: { name: 'Sino-Fendido', role: 'Especialista', hp: 820, posture: 220, dmg: 200, w: 34, h: 44, speed: 0, coins: 45, drop: 'lanca' },
-  sinoElite: { name: 'Sino-Fendido Ancestral', role: 'Mini-chefe de dungeon', hp: 2800, posture: 420, dmg: 230, w: 44, h: 54, speed: 0, coins: 220 },
+  cinzeiro: mob('Cinzeiro Trôpego', 'Bucha de canhão', 170, 60, 110, { w: 16, h: 23, speed: 92, coins: 8, drop: 'agulhas' }),
+  braseiro: mob('Braseiro Oco', 'Intermediário', 430, 130, 165, { w: 20, h: 40, speed: 74, coins: 22, drop: 'machado' }),
+  rasteja: mob('Rasteja-Fumaça', 'Rastejador', 250, 60, 130, { w: 30, h: 11, speed: 135, coins: 10, drop: 'agulhas' }),
+  gralha: mob('Gralha de Fuligem', 'Voador', 300, 70, 120, { w: 24, h: 18, speed: 120, coins: 12, drop: 'lanca' }),
+  sino: mob('Sino-Fendido', 'Especialista', 820, 220, 200, { w: 34, h: 44, speed: 0, coins: 45, drop: 'lanca' }),
+  sinoElite: mob('Sino-Fendido Ancestral', 'Mini-chefe de dungeon', 2800, 420, 230, { w: 44, h: 54, speed: 0, coins: 220 }),
 };
+// Endurecido: variante marcada no mapa (maior, com aura vermelha)
+export const ELITE = { hp: 2.0, dmg: 1.3, posture: 1.6, coins: 3 };
 
 export const BOSS = { name: 'Asgmor, O Louco', hp: 8500, posture: 720, coins: 600, coinsRematch: 250 };

@@ -228,7 +228,7 @@ function drawInteractable(ctx, it, world, cam, time) {
   if (x < -40 || x > VW + 40 || y < -20 || y > VH + 130 || it.type === 'sign') return;
   if (it.type === 'elion') return drawNPC(ctx, x, y, time);
   if (it.type === 'morren') return drawMorren(ctx, x, y, time);
-  if (it.type === 'ysara') return drawYsara(ctx, x, y, time, true);
+  if (it.type === 'ysara') { if (!rawProp.y || time - rawProp.y > 0.04) { rawProp.y = time; const t = time % 2.4; if (t < 1.5 && t % 0.5 > 0.3 && t % 0.5 < 0.36) for (let i = 0; i < 6; i++) world.fx.parts.push({ x: it.x + 17, y: it.y - 15, vx: -20 + Math.random() * 70, vy: -50 - Math.random() * 60, life: 0.45, max: 0.45, color: i % 2 ? '#ffc060' : '#ff8a3a', grav: 300, size: 1, glow: 1 }); } return drawYsara(ctx, x, y, time); }
   if (it.type === 'chest') { const op = !!world.flags.chests[it.id]; return piece(ctx, op ? 'bauaberto' : 'bau', x, y + 1, { scale: 0.86, sy: op ? 1 : 1 + Math.max(0, Math.sin(time * 2 + it.x)) * 0.015 }); }
   if (it.type === 'lever') return piece(ctx, 'alavanca', x, y + 1, { flip: world.leverOn(it.id), scale: 0.9 });
   if (it.type === 'stone') return piece(ctx, 'pedra', x, y + 1, { scale: 0.9 });

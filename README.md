@@ -49,13 +49,14 @@ A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT troca a poç
 ## O que tem nesta versão
 
 - **Combate soulslike** com os custos de Vigor e Foco do Vol. V: ataques leve e pesado, esquiva com invulnerabilidade, esquiva perfeita, aparo, postura e finalização.
-- **5 mobs** do Vale com os PV da tabela, patrulhas, alerta a aliados, territórios e reforço anunciado por sino.
-- **Asgmor, O Louco** (8.500 PV), conforme a ficha do Vol. V. Depois de vencê-lo, tocar o grande sino chama o eco dele para uma revanche.
+- **5 mobs** do Vale com golpes próprios (brasa cuspida, pancada com onda, emboscada por baixo da fumaça, rajada e mergulho), variantes **Endurecidas** de contorno vermelho, patrulhas, alerta a aliados, territórios e reforço anunciado por sino.
+- **Dificuldade alta**: vida, postura e dano ficam acima da tabela do manual por multiplicadores em `src/data.js` (`FORCA` e `ELITE`); pondo tudo em 1 volta ao valor canônico.
+- **Asgmor, O Louco** (8.500 PV), conforme a ficha do Vol. V, com 16 poses e mais dois golpes (garras e sino girado). Depois de vencê-lo, tocar o grande sino chama o eco dele para uma revanche.
 - **Cripta do Campanário**, a dungeon de 4 salas descrita no manual:
   1. Sinos falsos que atraem patrulhas.
   2. Cinza soprada em ciclos, com pilares como abrigo.
   3. Um desvio com baú protegido e a alavanca do atalho para Cinzeiral.
-  4. O Sino-Fendido Ancestral (mini-chefe, 2.800 PV). Silenciá-lo reduz os reforços no vale.
+  4. O Sino-Fendido Ancestral (mini-chefe). Silenciá-lo reduz os reforços no vale.
 - **Armas regionais**: Fio do Peregrino, Lança de Cinza Longa, Machado de Lenhador Cinzento, Agulhas do Errante e a arma-signatura **Ruptura** (35% na 1ª vitória, 15% nas seguintes, +10 p.p. por falha, até 75%). Armas repetidas viram Fragmentos de Memória.
 - **Maestria I–V** de O Louco: Salto de Cinzas, Risco Calculado e Caminho Improvável.
 - **Aliados**: Elion conta a história; Morren vende bombas, óleos e selos e compra ervas; Ysara aprimora armas de +1 a +5.
