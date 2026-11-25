@@ -6,8 +6,8 @@ import { S, r2, canvas } from './hd.js';
 
 export const img = {};
 const LIST = {
-  h_errante: 'sprites/h_errante.png', h_fio: 'sprites/h_fio.png', h_lanca: 'sprites/h_lanca.png', h_machado: 'sprites/h_machado.png', h_agulhas: 'sprites/h_agulhas.png', h_ruptura: 'sprites/h_ruptura.png',
-  atlas: 'cena/atlas.png', ceu: 'cena/ceu.webp', torres: 'cena/torres.webp', ruinas: 'cena/ruinas.webp', parede: 'cena/parede.webp', rocha: 'cena/rocha.webp', capa: 'cena/capa.webp',
+  h_errante: 'sprites/h_errante.webp', h_fio: 'sprites/h_fio.webp', h_lanca: 'sprites/h_lanca.webp', h_machado: 'sprites/h_machado.webp', h_agulhas: 'sprites/h_agulhas.webp', h_ruptura: 'sprites/h_ruptura.webp',
+  atlas: 'cena/atlas.webp', ceu: 'cena/ceu.webp', torres: 'cena/torres.webp', ruinas: 'cena/ruinas.webp', parede: 'cena/parede.webp', rocha: 'cena/rocha.webp', tijolo: 'cena/tijolo.webp', telha: 'cena/telha.webp', arena: 'cena/arena.webp', capa: 'cena/capa.webp',
 };
 let done = 0;
 export const progress = { f: 0 };

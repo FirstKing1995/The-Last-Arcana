@@ -31,6 +31,7 @@ A01 Despertar → A02 Cinzeiral → A03 Pátio dos Sinos → A04 Galeria → B05
 | 8.500 PV, kit completo, sino balança 0,7 s, rastro de 1,2 s | CANON | IMPLEMENTADO; corrigido erro em que a 2ª fase repetia o sino arrastado sem parar |
 | Dificuldade dos mobs acima da tabela "Os 115 mobs" (vida ×1,75, postura ×1,45, dano ×1,6; Asgmor com dano ×1,45 e os mesmos 8.500 PV) | Pedido do dono do jogo (25/11) | IMPLEMENTADO; valores canônicos guardados em `base` e nos multiplicadores `FORCA` de `src/data.js` |
 | Golpes extras dos mobs, variante Endurecida, garras e sino girado do Asgmor, no máximo três ataques simultâneos | PROPOSTA | IMPLEMENTADO; aguarda a palavra do Pedro |
+| Adereços, fachadas, água rasa na Cisterna e arcos do Campanário (só aparência, colisão igual) | PROPOSTA | IMPLEMENTADO em 25/11 |
 | Arena de 3,5 telas, porta de pedra, começo no círculo de cinza, sem mobs | CANON | IMPLEMENTADO (84 tiles; antes eram 2,3 telas) |
 | Magia elemental removida | CANON | IMPLEMENTADO (saiu Brasa Lançada) |
 | Três poções, recarga de 1,5 s, frascos divididos | CANON | IMPLEMENTADO (Q bebe, R troca, preparo na pira) |

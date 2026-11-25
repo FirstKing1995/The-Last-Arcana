@@ -1,15 +1,15 @@
 // Cenário, iluminação e HUD — Vale das Cinzas.
 // Paleta-base (Atlas, Vol. III): carvão #25252A, cinza #625B58, brasa #B66A3B, tecido queimado #D9B58A, runa #A72F2F.
 import { TILE } from './physics.js';
-import { VW, VH } from './world.js';
+import { VW, VH } from './view.js';
 import { drawMob, drawNPC, drawMorren, drawYsara, drawFauna, drawEcho, brokenMark } from './sprites.js';
 import { drawErrante, drawAsgmor, piece, has, size, img } from './art.js';
 import { backdrop, ashFall, drawTiles, hash, shaft, fog } from './scene.js';
 import { r2, cached, blit, canvas, S } from './hd.js';
-import { ARCANA, ITEMS, HERBS, POTIONS, POTION_IDS } from './data.js';
-import { Input } from './input.js';
-
-export const FONT = 'Silkscreen, "Courier New", monospace';
+import { HERBS } from './data.js';
+import { caveMask } from './chunks.js';
+import { fogos, cintila, pendulo, pano, capim, pegadas, sombra, agua } from './vida.js';
+import { cfg, Q } from './config.js';
 
 // ---------- luzes (brilho aditivo) ----------
 const glowCache = new Map();
@@ -37,17 +37,27 @@ function light(ctx, x, y, r, color, a = 1) {
 const ANIM = { bellpost: [8, 2 * Math.PI / 1.6 / 8], torch: [2, Math.PI / 14], forge: [2, Math.PI / 10], bigbell: [8, 2 * Math.PI / 0.8 / 8], chain: [6, 0.5], gearbell: [6, 0.5] };
 const BOX = { bigbell: [240, 230, 120, 224] };
 const PIECE = { column: (p) => (p.broken ? 'colunaq' : 'coluna'), fallenbell: () => 'sinocaido', bellpost: () => 'poste', torch: () => 'tocha', coffin: () => 'caixao', deadtree: () => 'arvore', bigbell: () => 'sinao' };
-const HANG = { gaiola: 1, estandarte: 1, sinao: 1, lanterna: 1 };
-function drawProp(ctx, pr, cam, time) {
+const HANG = { gaiola: 1, sinao: 1, lanterna: 1 };
+const PANO = { estandarte: 1.6, trapo: 2 };
+function drawProp(ctx, pr, cam, time, world) {
   const x = pr.x - cam.x, y = pr.y - cam.y;
   if (x < -130 || x > VW + 130 || y < -60 || y > VH + 220) return;
   const nm = PIECE[pr.type] ? PIECE[pr.type](pr) : pr.type;
   if (has(nm)) {
     const o = { flip: pr.flip || (pr.v === 1 && nm !== 'casa2'), scale: pr.scale || 1 };
+    if (PANO[nm]) { const h = size(nm)[1]; pano(ctx, nm, x, pr.top ? y - 1 : y - h, time, PANO[nm]); return; }
+    if (nm === 'teia') { const [w, h] = size(nm); piece(ctx, nm, x + (pr.flip ? -w / 2 : w / 2), y + h, { flip: pr.flip, sy: 1 + Math.sin(time * 1.3 + pr.x) * 0.02 }); return; }
+    if (pr.top) {
+      const h = size(nm)[1];
+      ctx.save(); ctx.translate(r2(x), r2(y)); ctx.rotate(nm === 'raizes' ? Math.sin(time * 0.8 + pr.x) * 0.02 : pendulo(pr, world, time, h)); piece(ctx, nm, 0, h - 1, o);
+      ctx.restore(); return;
+    }
+    if (nm === 'varal') { const h = size(nm)[1]; pano(ctx, nm, x, y - h + 1, time, 0, 0); return; }
     if (pr.type === 'column' && pr.tall) { piece(ctx, 'coluna', x, y, { ...o, sy: 1.9, sx: 1.15 }); return; }
     if (pr.type === 'bigbell') { const sw = Math.sin(time * 0.8) * 0.05; ctx.fillStyle = '#17181d'; ctx.fillRect(r2(x) - 1, y - 260, 2, 150); piece(ctx, 'sinao', x, y - 62, { scale: 1.5, rot: sw }); return; }
-    if (HANG[nm]) { const h = size(nm)[1]; ctx.save(); ctx.translate(r2(x), r2(y - h)); ctx.rotate(Math.sin(time * 0.9 + pr.x) * (nm === 'estandarte' ? 0.015 : 0.035)); piece(ctx, nm, 0, h, o); ctx.restore(); return; }
+    if (HANG[nm]) { const h = size(nm)[1]; ctx.save(); ctx.translate(r2(x), r2(y - h)); ctx.rotate(pendulo({ get x() { return pr.x; }, get y() { return pr.y - h; }, get a() { return pr.a; }, set a(v) { pr.a = v; }, get va() { return pr.va; }, set va(v) { pr.va = v; } }, world, time, h)); if (pr.cor === undefined) { let k = 0; const l = world.level, tx = Math.floor(pr.x / TILE); let ty = Math.floor((pr.y - h) / TILE); while (k < 10 && !l.solid(tx, ty - k)) k++; pr.cor = k < 10 ? pr.y - h - (ty - k + 1) * TILE : 0; } if (pr.cor > 0) for (let q = 0; q < pr.cor + 2; q += 3) { ctx.fillStyle = '#0b0a0d'; ctx.fillRect(-1, -q - 3, 2, 3); ctx.fillStyle = q % 6 ? '#5a5c66' : '#3a3c44'; ctx.fillRect(-0.5, -q - 3, 1, 2.5); } piece(ctx, nm, 0, h, o); ctx.restore(); return; }
     if (nm === 'tocha') { piece(ctx, nm, x, y + 8, { sy: 1 + Math.sin(time * 17 + pr.x) * 0.03 }); flame(ctx, x, y - 12, time + pr.x, 0.7); return; }
+    if (nm === 'lampiao') { piece(ctx, nm, x, y + 1, o); flame(ctx, x + (pr.flip ? 11 : -11), y - 48, time + pr.x, 0.28); return; }
     if (nm === 'arvore') { piece(ctx, nm, x, y + 2, { ...o, rot: Math.sin(time * 0.7 + pr.x) * 0.008 }); return; }
     piece(ctx, nm, x, y + (nm.startsWith('casa') || nm === 'forjaria' ? 2 : 1), o);
     return;
@@ -140,6 +150,11 @@ function rawProp(ctx, pr, sx, sy, time) {
       R(-4, -46, 8, 7, '#4b4d56'); R(-2, -44, 4, 3, '#777a85');
       for (let k = 0; k < 40; k += 4) { R(-1, -39 + k, 2, 3, '#5a5c66'); R(0, -37 + k, 1, 1, '#2a2b30'); }
       R(-38, -4, 6, 4, '#34353e'); R(32, -4, 6, 4, '#34353e');
+      break;
+    }
+    case 'jan2': {
+      R(-7, -22, 14, 22, '#0c0b0f'); R(-6, -21, 12, 20, '#3a2c22'); R(-5, -20, 10, 18, '#e08a3c'); R(-5, -20, 10, 7, '#ffbe62'); R(-3, -18, 6, 9, '#ffdf9a');
+      R(-1, -20, 1, 18, '#3a2c22'); R(-5, -12, 10, 1, '#3a2c22'); R(-8, -1, 16, 2, '#4a4650'); R(-8, -24, 16, 2, '#4a4650'); R(-8, -2, 16, 1, '#c3ccd6');
       break;
     }
     case 'crack': {
@@ -316,13 +331,13 @@ function rawInteractable(ctx, it, world, sx, sy, time, on) {
   }
 }
 
+const time0 = (w) => w.time;
 let lmC = null, lmX = null;
 const LK = 4; // o mapa de luz tem 1/4 do tamanho e é ampliado com suavidade
 function lights(ctx, world, cam, time) {
   const list = [];
   const L = (x, y, r, col, a, soft) => { const sx = x - cam.x, sy = y - cam.y; if (sx > -r * 2.6 && sx < VW + r * 2.6 && sy > -r * 2.6 && sy < VH + r * 2.6) list.push([sx, sy, r, col, a, soft]); };
   for (const it of world.interactables) {
-    if (it.type === 'shrine') L(it.x, it.y - 18, 64, '#e0783a', 0.75 + Math.sin(time * 9) * 0.06);
     if (it.type === 'elion') L(it.x + 7, it.y - 24, 14, '#5aa6a0', 0.5);
     if (it.type === 'chest' && !world.flags.chests[it.id]) L(it.x, it.y - 6, 18, '#b0893a', 0.35);
     if (it.type === 'stone') L(it.x, it.y - 18, 22, '#e07a3a', 0.4);
@@ -330,17 +345,16 @@ function lights(ctx, world, cam, time) {
     if (it.type === 'portal' && world.flags.bossDefeated && !world.arenaLocked) L(it.x, it.y - 16, 30, '#a08a6a', 0.5);
     if (it.type === 'herb' && it.state === 0) L(it.x, it.y - 5, 8, '#7a7a5a', 0.3);
   }
+  for (const q of fogos(world.level)) { const k = cintila(q.s, time); L(q.x, q.y, q.r * (0.94 + k * 0.06), q.col, q.a * k); }
   for (const pr of world.level.props) {
-    if (pr.type === 'torch') L(pr.x, pr.y - 16, 52, '#f08a44', 0.7 + Math.sin(time * 9 + pr.x) * 0.06);
-    if (pr.type === 'janela') { L(pr.x, pr.y - 40, 46, '#ffd68c', 0.6); L(pr.x + 60, pr.y + 20, 56, '#c8a468', 0.35); }
-    if (pr.type.startsWith('casa')) { L(pr.x + (pr.flip ? -14 : 14), pr.y - 22, 30, '#f09a50', 0.6); if (pr.type === 'casa2') L(pr.x - 14, pr.y - 60, 26, '#f09a50', 0.5); }
-    if (pr.type === 'forjaria') L(pr.x + 24, pr.y - 16, 46, '#ff8a40', 0.75 + Math.sin(time * 11) * 0.08);
+    if (pr.type === 'janela') { L(pr.x, pr.y - 40, 46, '#ffd68c', 0.5); L(pr.x + (pr.len || 90) * 0.5, pr.y + (pr.len || 90) * 0.9, 40, '#a88a58', 0.3, 1); }
+    if (pr.type.startsWith('casa')) { L(pr.x + (pr.flip ? -14 : 14), pr.y - 22, 34, '#f09a50', 0.6 + Math.sin(time * 5 + pr.x) * 0.06); if (pr.type === 'casa2') L(pr.x - 14, pr.y - 60, 26, '#f09a50', 0.5); }
+    if (pr.type === 'jan2') L(pr.x, pr.y - 11, 34, '#ffa850', 0.62 + Math.sin(time * 4 + pr.x) * 0.05);
     if (pr.type === 'fallenbell') L(pr.x, pr.y - 14, 16, '#e07a3a', 0.3);
     if (pr.type === 'estandarte') L(pr.x, pr.y - 34, 14, '#ff4a5a', 0.35);
-    if (pr.type === 'forge') L(pr.x, pr.y - 8, 34, '#c0602a', 0.55);
-    if (pr.type === 'house') L(pr.x + 14, pr.y - 21, 22, '#b65a2b', 0.45);
     if (pr.type === 'ashcircle') L(pr.x, pr.y - 2, 34, '#8a6a52', 0.3 + Math.sin(time * 2) * 0.08);
     if (pr.type === 'bellpost') L(pr.x + 13, pr.y - 30, 10, '#b65a2b', 0.25);
+    if (pr.type === 'entulho' || pr.type === 'desabe') L(pr.x, pr.y - 5, 12, '#b0602a', 0.12);
   }
   const p = world.player;
   L(p.cx() + (p.facing > 0 ? 4 : -4), p.y + p.h - 23, 6, '#c8383a', 0.3 + Math.sin(time * 4) * 0.1);
@@ -366,18 +380,19 @@ function lights(ctx, world, cam, time) {
     else if (o.constructor.name === 'AshPatch') { const arming = o.t > o.fuse - o.warn; L(o.x, o.y - 3, arming ? 26 : 10, arming ? '#d0502a' : '#5a534f', arming ? 0.6 : 0.2); }
     else if (o.constructor.name === 'Shockwave') L(o.x, o.y - 5, 22, '#ff9050', 0.7);
   }
+  if (p.sw) { const e = time0(world) - p.sw.t; if (e >= 0 && e < 0.16) L(p.cx() + p.facing * 20, p.cy() - 4, 40, p.sw.weapon === 'ruptura' ? '#ff8a40' : '#d8d4e0', 0.5 * (1 - e / 0.16)); }
+  if (p.perfectFlash > 0) L(p.cx(), p.cy(), 60, '#e8e4ff', p.perfectFlash * 2);
+  for (const v of world.fx.vis) if (v.k === 'boom') L(v.x, v.y, 70, '#ff9a50', 1 - v.t / v.d);
   for (const v of world.fx.vis) if (v.k === 'star') L(v.x, v.y, 40, v.color === '#fff6e0' ? '#ffe0b0' : v.color, 0.8 * (1 - v.t / v.d));
   // 1) multiplica: escuro fora das luzes
-  if (!lmC) { [lmC, lmX] = canvas(VW / LK, VH / LK); }
-  const k = world.ambK === undefined ? (world.inCave ? 1 : 0) : world.ambK;
-  world.ambK = k + ((world.inCave ? 1 : 0) - k) * 0.06;
-  const mix = (a, b) => Math.round(a + (b - a) * world.ambK);
-  lmX.globalCompositeOperation = 'source-over'; lmX.fillStyle = `rgb(${mix(200, 98)},${mix(192, 106)},${mix(206, 132)})`; lmX.fillRect(0, 0, lmC.width, lmC.height);
+  if (!lmC || lmC.width !== Math.ceil(VW / LK)) { [lmC, lmX] = canvas(Math.ceil(VW / LK), VH / LK); }
+  lmX.globalCompositeOperation = 'source-over'; lmX.globalAlpha = 1; lmX.fillStyle = 'rgb(200,192,206)'; lmX.fillRect(0, 0, lmC.width, lmC.height);
+  lmX.imageSmoothingEnabled = true; lmX.drawImage(caveMask(world.level), cam.x / TILE, cam.y / TILE, VW / TILE, VH / TILE, 0, 0, VW / LK, VH / LK);
   lmX.globalCompositeOperation = 'lighter'; lmX.imageSmoothingEnabled = true;
   for (const [x, y, r, col, a] of list) { const R = r * 2.1 / LK; lmX.globalAlpha = Math.min(1, a * 0.95); lmX.drawImage(glow(col, 32), x / LK - R, y / LK - R, R * 2, R * 2); }
   lmX.globalAlpha = 1;
   ctx.globalCompositeOperation = 'multiply'; ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(lmC, 0, 0, VW, VH);
+  ctx.drawImage(lmC, 0, 0, lmC.width * LK, VH);
   // 2) soma: o brilho perto da fonte
   ctx.globalCompositeOperation = 'lighter';
   for (const [x, y, r, col, a, soft] of list) { if (soft) continue; ctx.globalAlpha = Math.min(1, a * 0.34); ctx.drawImage(glow(col, 32), x - r, y - r, r * 2, r * 2); }
@@ -423,19 +438,6 @@ function drawTrail(ctx, p, cam, time) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
-// Vinheta e tom geral, gerados uma vez
-let vignette = null;
-function drawVignette(ctx) {
-  if (!vignette) {
-    vignette = document.createElement('canvas'); vignette.width = VW; vignette.height = VH;
-    const c = vignette.getContext('2d');
-    const g = c.createRadialGradient(VW / 2, VH * 0.55, VH * 0.35, VW / 2, VH * 0.55, VW * 0.72);
-    g.addColorStop(0, 'rgba(8,6,10,0)'); g.addColorStop(1, 'rgba(8,6,10,0.62)');
-    c.fillStyle = g; c.fillRect(0, 0, VW, VH);
-  }
-  ctx.drawImage(vignette, 0, 0);
-}
-
 function drawBreakable(ctx, b, cam) {
   const x = b.x - cam.x, y = b.y - cam.y;
   if (x < -20 || x > VW + 20 || y < -10 || y > VH + 20) return;
@@ -457,204 +459,19 @@ function drawLoot(ctx, l, cam, time) {
   piece(ctx, 'i_' + l.id, sx, sy + 8);
 }
 
-// ---------- HUD ----------
-export function text(ctx, s, x, y, color = '#e8e0d0', align = 'left', size = 8, shadow = '#0a090c') {
-  ctx.font = `${size}px ${FONT}`;
-  ctx.textAlign = align;
-  ctx.textBaseline = 'alphabetic';
-  if (shadow) { ctx.fillStyle = shadow; ctx.fillText(s, Math.round(x) + 1, Math.round(y) + 1); ctx.fillText(s, Math.round(x), Math.round(y) + 1); }
-  ctx.fillStyle = color; ctx.fillText(s, Math.round(x), Math.round(y));
-}
-export function wrap(ctx, s, maxW, size = 8) {
-  ctx.font = `${size}px ${FONT}`;
-  const words = s.split(' '), lines = []; let cur = '';
-  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
-  if (cur) lines.push(cur);
-  return lines;
-}
-
-function frameBox(ctx, x, y, w, h, accent = '#6d4b32') {
-  ctx.fillStyle = '#0a090c'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-  ctx.fillStyle = accent; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-  ctx.fillStyle = '#141216'; ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = '#1f1c21'; ctx.fillRect(x, y, w, 1);
-}
-
-function bar(ctx, x, y, w, h, frac, col, hi, ghost) {
-  ctx.fillStyle = '#0a090c'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-  ctx.fillStyle = '#3a2f2a'; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-  ctx.fillStyle = '#121014'; ctx.fillRect(x, y, w, h);
-  const f = Math.max(0, Math.min(1, frac));
-  if (ghost !== undefined) { ctx.fillStyle = '#d9b58a'; ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, ghost))), h); }
-  ctx.fillStyle = col; ctx.fillRect(x, y, Math.round(w * f), h);
-  ctx.fillStyle = hi; ctx.fillRect(x, y, Math.round(w * f), 1);
-  // pontas ornamentais
-  ctx.fillStyle = '#8b633f'; ctx.fillRect(x - 3, y + Math.floor(h / 2) - 1, 2, 2); ctx.fillRect(x + w + 1, y + Math.floor(h / 2) - 1, 2, 2);
-}
-
-function rune(ctx, x, y, time) {
-  ctx.fillStyle = '#0a090c'; ctx.fillRect(x - 6, y - 6, 13, 13);
-  ctx.fillStyle = '#3a2f2a';
-  for (let i = -5; i <= 5; i++) { const w = 6 - Math.abs(i); ctx.fillRect(x - w, y + i, w * 2 + 1, 1); }
-  ctx.fillStyle = '#141216';
-  for (let i = -4; i <= 4; i++) { const w = 5 - Math.abs(i); ctx.fillRect(x - w, y + i, w * 2 + 1, 1); }
-  ctx.fillStyle = Math.sin(time * 3) > 0 ? '#e0404a' : '#a72f2f';
-  ctx.fillRect(x, y - 3, 1, 7); ctx.fillRect(x - 2, y - 1, 5, 1);
-}
-
-function slot(ctx, x, y, label, active, drawIcon, cdFrac = 0, keyHint) {
-  frameBox(ctx, x, y, 18, 18, active ? '#d4b66f' : '#4a3d34');
-  drawIcon(ctx, x, y);
-  if (cdFrac > 0) { ctx.globalAlpha = 0.72; ctx.fillStyle = '#000'; ctx.fillRect(x, y, 18, Math.round(18 * cdFrac)); ctx.globalAlpha = 1; }
-  if (label) text(ctx, label, x + 17, y + 17, '#e8e0d0', 'right', 8);
-  if (keyHint) text(ctx, keyHint, x + 9, y + 27, '#6a635e', 'center', 8);
-}
-
-const ghost = { hp: 1, boss: 1 };
-
-function drawHUD(ctx, world, time, dt) {
-  const p = world.player;
-  const touch = Input.touchMode;
-  const hpFrac = p.hp / p.maxHp;
-  ghost.hp = ghost.hp > hpFrac ? Math.max(hpFrac, ghost.hp - dt * 0.4) : hpFrac;
-  rune(ctx, 13, 13, time);
-  bar(ctx, 24, 8, 112, 5, hpFrac, '#a72f2f', '#d0505a', ghost.hp);
-  if (p.healLeft > 0) { ctx.globalAlpha = 0.6; ctx.fillStyle = '#7fc48a'; ctx.fillRect(24 + Math.round(112 * hpFrac), 8, Math.round(112 * p.healLeft / p.maxHp), 5); ctx.globalAlpha = 1; }
-  bar(ctx, 24, 17, 84, 2, p.vigor / p.maxVigor, '#8fb36a', '#b9d494');
-  bar(ctx, 24, 23, 84, 2, p.foco / p.maxFoco, '#6b9ea3', '#a6d2d6');
-
-  // espaços: frasco, Arcano I, Arcano II, grimório (no celular ficam no alto, longe do polegar)
-  const by = touch ? 34 : VH - 34;
-  const keys = !touch;
-  const pid = world.prog.potion, PT = POTIONS[pid], have = p.flasks[pid];
-  slot(ctx, 10, by, String(have), false, (c, x, y) => {
-    c.globalAlpha = have > 0 ? 1 : 0.3; piece(c, 'i_' + pid, x + 9, y + 17); c.globalAlpha = 1;
-  }, Math.max(0, p.drinkCd / 1.5), keys ? 'Q' : null);
-  // os outros tipos, em miniatura (R troca)
-  POTION_IDS.forEach((id, i) => {
-    const x = 11 + i * 6, y = by - 7;
-    ctx.fillStyle = '#0a090c'; ctx.fillRect(x - 0.5, y - 0.5, 5, 4);
-    ctx.fillStyle = p.flasks[id] > 0 ? POTIONS[id].color : '#3a3a3c'; ctx.fillRect(x, y, 4, 3);
-    if (id === pid) { ctx.fillStyle = '#f0e8d8'; ctx.fillRect(x, y + 3.5, 4, 0.5); }
-  });
-  for (let i = 0; i < 2; i++) {
-    const a = p.arcana[i];
-    const cd = a ? (p.cooldowns[a] || 0) / ARCANA[a].abilities[0].cd : 0;
-    slot(ctx, 36 + i * 24, by, null, p.activeSlot === i, (c, x, y) => {
-      if (!a) { c.fillStyle = '#2a262b'; c.fillRect(x + 6, y + 8, 6, 2); return; }
-      // carta de tarô em miniatura
-      c.fillStyle = '#d4b66f'; c.fillRect(x + 4, y + 2, 10, 14);
-      c.fillStyle = '#29272a'; c.fillRect(x + 5, y + 3, 8, 12);
-      c.fillStyle = ARCANA[a].color; c.fillRect(x + 8, y + 5, 2, 2); c.fillRect(x + 7, y + 8, 4, 1); c.fillRect(x + 8, y + 9, 2, 4);
-      c.fillStyle = '#d4b66f'; c.fillRect(x + 8, y + 13, 2, 1);
-    }, cd, keys ? (i === 0 ? 'F' : 'Tab') : null);
-  }
-  // item rápido (bomba, óleo, selo)
-  const q = world.prog.quick, qn = world.prog.items[q] || 0;
-  slot(ctx, 90, by, String(qn), false, (c, x, y) => {
-    c.globalAlpha = qn > 0 ? 1 : 0.3; piece(c, 'i_' + q, x + 9, y + 17); c.globalAlpha = 1;
-    if (p.itemCd > 0 && q === 'bomba') { c.globalAlpha = 0.6; c.fillStyle = '#000'; c.fillRect(x, y, 18, Math.round(18 * p.itemCd / 12)); c.globalAlpha = 1; }
-  }, 0, keys ? 'C' : null);
-  // arma na mão (T troca)
-  slot(ctx, 116, by, null, true, (c, x, y) => {
-    const w = world.prog.equipped;
-    if (w) piece(c, 'i_' + w, x + 9, y + 17);
-    else { c.fillStyle = '#6a635e'; c.fillRect(x + 5, y + 7, 8, 6); c.fillRect(x + 4, y + 9, 2, 4); c.fillStyle = '#8a827b'; for (let i = 0; i < 4; i++) c.fillRect(x + 5 + i * 2, y + 6, 1.5, 3); }
-  }, 0, keys ? 'T' : null);
-  // moedas
-  ctx.fillStyle = '#0a090c'; ctx.fillRect(24 + 88 + 6, 15, 3, 3);
-  ctx.fillStyle = '#d4b66f'; ctx.fillRect(24 + 88 + 7, 16, 3, 3);
-  text(ctx, String(world.prog.coins), 24 + 88 + 13, 22, '#e8c96a', 'left', 8);
-  let by2 = 36;
-  const note = (s, col) => { text(ctx, s, 24, by2, col, 'left', 8); by2 += 10; };
-  if (p.oil > 0) note(`óleo ${Math.ceil(p.oil)}s`, '#ffb070');
-  if (p.empowered > 0) note('risco calculado', '#f6f1e8');
-  if (p.defBuff > 0) note(`defesa ${Math.ceil(p.defBuff)}s`, POTIONS.defesa.color);
-  if (p.dmgBuff > 0) note(`dano ${Math.ceil(p.dmgBuff)}s`, POTIONS.dano.color);
-  if (world.roomName && !world.banner && !world.dialog) {
-    const q = world.roomName.t, al = Math.max(0, Math.min(1, q * 2, (3.2 - q) * 2));
-    ctx.globalAlpha = al; text(ctx, world.roomName.text, VW / 2, touch ? 58 : 34, '#c3ccd6', 'center', 8);
-    ctx.fillStyle = '#80664c'; ctx.fillRect(VW / 2 - 30, (touch ? 58 : 34) + 4, 60, 0.5); ctx.globalAlpha = 1;
-  }
-
-  // barra do chefe
-  const b = world.boss;
-  if (world.arenaLocked && b && !b.dead && b.state !== 'dormant') {
-    const frac = b.hp / b.def.hp;
-    ghost.boss = ghost.boss > frac ? Math.max(frac, ghost.boss - dt * 0.25) : frac;
-    const w = touch ? 180 : 220, x = Math.round((VW - w) / 2) + (touch ? -40 : 62), y = touch ? 26 : VH - 20;
-    text(ctx, b.def.name.toUpperCase(), x, y - 5, '#d9b58a', 'left', 8);
-    bar(ctx, x, y, w, 4, frac, '#a72f2f', '#d0505a', ghost.boss);
-    ctx.fillStyle = '#ffd27a'; ctx.fillRect(x + w / 2 - 30, y + 7, Math.round(60 * Math.min(1, b.posture / b.def.posture)), 1);
-  }
-
-  // indicação de interação
-  if (!world.dialog && !p.action) {
-    const fin = world.finisherTarget();
-    const it = world.nearbyInteractable();
-    let label = null, lx = 0, ly = 0;
-    if (fin) { label = 'E  FINALIZAR'; lx = fin.cx(); ly = fin.y - 18; }
-    else if (it) {
-      label = 'E  ' + { shrine: 'DESCANSAR', elion: 'CONVERSAR', chest: 'ABRIR', stone: 'LER', sign: 'EXAMINAR', morren: 'COMÉRCIO', ysara: 'FORJA', herb: 'COLHER', lever: 'PUXAR ALAVANCA', bigbell: 'TOCAR O SINO (REVANCHE)', portal: 'VOLTAR A CINZEIRAL' }[it.type];
-      lx = it.x; ly = it.y - (it.type === 'herb' ? 22 : 42);
-    }
-    if (label) {
-      const x = Math.round(lx - world.cam.x), y = Math.round(ly - world.cam.y);
-      ctx.font = `8px ${FONT}`;
-      const w = Math.ceil(ctx.measureText(label).width) + 8;
-      ctx.globalAlpha = 0.8; ctx.fillStyle = '#0a090c'; ctx.fillRect(x - w / 2, y - 8, w, 11); ctx.globalAlpha = 1;
-      ctx.fillStyle = '#d4b66f'; ctx.fillRect(x - w / 2, y + 3, w, 1);
-      text(ctx, label, x, y, '#f0e0b8', 'center', 8, null);
-    }
-  }
-
-  let ty = 0;
-  world.toasts.forEach((t) => {
-    ctx.globalAlpha = Math.max(0, Math.min(1, (t.dur - t.t) * 3, t.t * 6));
-    const lines = wrap(ctx, t.text, touch ? 250 : 330, 8);
-    const y0 = (touch ? 72 : 48) + ty;
-    ctx.globalAlpha *= 0.55; ctx.fillStyle = '#0a090c'; ctx.fillRect(VW / 2 - 172, y0 - 8, 344, lines.length * 10 + 1); ctx.globalAlpha /= 0.55;
-    lines.forEach((ln, k) => text(ctx, ln, VW / 2, y0 + k * 10, '#e8e0d0', 'center', 8));
-    ty += lines.length * 10 + 3;
-    ctx.globalAlpha = 1;
-  });
-
-  if (world.banner) {
-    const bn = world.banner;
-    const a = Math.max(0, Math.min(1, bn.t * 2, (bn.dur - bn.t) * 2));
-    ctx.globalAlpha = a * 0.75; ctx.fillStyle = '#0a090c'; ctx.fillRect(0, VH / 2 - 26, VW, 46);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = '#6d4b32'; ctx.fillRect(VW / 2 - 90, VH / 2 - 24, 180, 1); ctx.fillRect(VW / 2 - 90, VH / 2 + 18, 180, 1);
-    text(ctx, bn.text, VW / 2, VH / 2 - 2, bn.small ? '#e8e0d0' : '#e8c98e', 'center', bn.small ? 8 : 16);
-    text(ctx, bn.sub, VW / 2, VH / 2 + 12, '#a59d95', 'center', 8);
-    ctx.globalAlpha = 1;
-  }
-
-  if (world.dialog) {
-    const d = world.dialog;
-    const [who, msg] = d.lines[d.i];
-    const full = wrap(ctx, msg, VW - 58, 8), h = Math.max(34, 18 + Math.min(5, full.length) * 9 + 6);
-    const x = 20, w = VW - 40, y = touch ? 34 : VH - h - 8;
-    ctx.globalAlpha = 0.92; frameBox(ctx, x, y, w, h, '#6d4b32'); ctx.globalAlpha = 1;
-    ctx.fillStyle = '#8b633f'; ctx.fillRect(x + 4, y + 4, 3, 3);
-    text(ctx, who.toUpperCase(), x + 11, y + 10, '#d9b58a', 'left', 8);
-    const shown = msg.slice(0, Math.floor(d.chars));
-    wrap(ctx, shown, w - 18, 8).slice(0, 5).forEach((ln, i) => text(ctx, ln, x + 9, y + 22 + i * 9, '#e8e0d0', 'left', 8));
-    if (d.chars >= msg.length && Math.sin(time * 6) > 0) { ctx.fillStyle = '#d4b66f'; ctx.fillRect(x + w - 10, y + h - 7, 5, 1); ctx.fillRect(x + w - 9, y + h - 6, 3, 1); ctx.fillRect(x + w - 8, y + h - 5, 1, 1); }
-  }
-}
-
 // ---------- quadro completo ----------
 export function renderWorld(ctx, world, time, dt) {
   const cam = { x: world.cam.x, y: world.cam.y };
-  if (world.shake > 0) { cam.x += (Math.random() - 0.5) * world.shake; cam.y += (Math.random() - 0.5) * world.shake; }
+  if (world.shake > 0 && cfg.tremor) { cam.x += (Math.random() - 0.5) * world.shake; cam.y += (Math.random() - 0.5) * world.shake; }
   cam.x = r2(cam.x); cam.y = r2(cam.y);
   const underground = world.inCave;
   backdrop(ctx, cam, time, world);
   if (!underground) ashFall(ctx, cam, time, world, 0);
   drawTiles(ctx, world, cam, time);
-  for (const pr of world.level.props) drawProp(ctx, pr, cam, time);
-  for (const it of world.interactables) drawInteractable(ctx, it, world, cam, time);
+  for (const pr of world.level.props) drawProp(ctx, pr, cam, time, world);
+  if (!underground) pegadas(ctx, world, cam);
+  if (Q.nivel > 0) capim(ctx, world, cam, time);
+  for (const it of world.interactables) { if (it.type === 'elion' || it.type === 'morren' || it.type === 'ysara') if (Math.abs(it.x - cam.x - VW / 2) < VW) sombra(ctx, world.level, it.x, it.y, 11, cam); drawInteractable(ctx, it, world, cam, time); }
   for (const b of world.breakables) drawBreakable(ctx, b, cam);
   for (const f of world.fauna) { const fx = f.fx - cam.x; if (fx > -20 && fx < VW + 20) drawFauna(ctx, f, fx, f.fy - cam.y, time); }
   for (const l of world.loot) drawLoot(ctx, l, cam, time);
@@ -662,22 +479,25 @@ export function renderWorld(ctx, world, time, dt) {
   for (const m of [...world.mobs, ...world.summons]) {
     const sx = m.cx() - cam.x, sy = m.y + m.h - cam.y;
     if (sx < -60 || sx > VW + 60 || sy < -40 || sy > VH + 80) continue;
+    if (!m.dead && m.state !== 'dig') sombra(ctx, world.level, m.cx(), m.y + m.h, m.w * 0.6, cam);
     drawMob(ctx, m, sx, sy, time);
   }
   const b = world.boss;
   if (b && Math.abs(b.cx() - cam.x - VW / 2) < VW) { drawAsgmor(ctx, b, b.cx() - cam.x, b.y + b.h - cam.y, time); if (b.isBroken()) brokenMark(ctx, b.cx() - cam.x, b.y - cam.y - 34, time); }
   const p = world.player;
+  if (b && !b.dead && Math.abs(b.cx() - cam.x - VW / 2) < VW) sombra(ctx, world.level, b.cx(), b.y + b.h, 22, cam);
+  if (!p.dead) sombra(ctx, world.level, p.cx(), p.y + p.h, 10, cam);
   for (const g of p.ghosts) drawErrante(ctx, { facing: g.facing, an: { n: g.n, f: g.f }, flash: 0, invuln: 0, dead: false, perfectFlash: 0, ghost: p.action === 'ability' ? '#d9b58a' : '#7f8fb8' }, g.x - cam.x, g.y - cam.y, time, g.t * 1.6);
   drawErrante(ctx, p, p.cx() - cam.x, p.y + p.h - cam.y, time);
   lights(ctx, world, cam, time);
   // feixes das janelas passam na frente de tudo, com poeira
-  for (const pr of world.level.props) if (pr.type === 'janela') { const x = pr.x - cam.x, y = pr.y - cam.y; if (x > -160 && x < VW + 40 && y > -160 && y < VH + 80) shaft(ctx, x, y - 6, time, 24, 130); }
+  for (const pr of world.level.props) if (pr.type === 'janela') { const x = pr.x - cam.x, y = pr.y - cam.y; if (x > -160 && x < VW + 40 && y > -160 && y < VH + 80) { if (pr.len === undefined) { pr.len = 20; while (pr.len < 130 && !world.level.solid(Math.floor((pr.x + pr.len * 0.5) / TILE), Math.floor((pr.y - 6 + pr.len) / TILE))) pr.len += 2; } shaft(ctx, x, y - 6, time, 24, pr.len, '255,214,140', 0.2, true); } }
   drawTrail(ctx, p, cam, world.time);
+  agua(ctx, world, cam, time);
   world.fx.draw(ctx, cam);
-  if (!underground) { ashFall(ctx, cam, time, world, 1); fog(ctx, cam, time, VH - 78, 1.15, 0.5, 16); } else fog(ctx, cam, time, VH - 84, 1.1, 0.35, 6);
+  if (!underground) { ashFall(ctx, cam, time, world, 1); if (Q.nivel > 0) fog(ctx, cam, time, VH - 96, 1.15, 0.36, 16); } else if (Q.nivel > 0) fog(ctx, cam, time, VH - 100, 1.1, 0.2, 6);
   foreground(ctx, cam, time, world);
   if (world.flashScreen > 0) { ctx.globalAlpha = world.flashScreen * 3; ctx.fillStyle = '#fff3c4'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
-  drawHUD(ctx, world, time, dt);
 }
 
 // Silhuetas escuras bem perto da câmera dão profundidade
@@ -692,7 +512,7 @@ function foreground(ctx, cam, time, world) {
     ctx.fillStyle = '#050609';
     if (world.inCave) {
       const sw = Math.sin(time * 0.8 + i) * 2;
-      for (let y = 0; y < 34 + h * 34; y += 4) { ctx.fillRect(r2(x + sw * y / 60), y, 2, 3); ctx.fillRect(r2(x + sw * y / 60) - 0.5, y + 1, 3, 1); }
+      for (let y = 0; y < 34 + h * 34; y += 5) { const q = r2(x + sw * y / 60); ctx.fillRect(q - 1.5, y, 3, 1); ctx.fillRect(q - 1.5, y, 1, 5); ctx.fillRect(q + 0.5, y, 1, 5); ctx.fillRect(q - 0.5, y + 4, 1, 3); }
     } else {
       const dir = h > 0.65 ? 1 : -1;
       for (let k = 0; k < 60; k++) { ctx.fillRect(r2(x + dir * k * 0.9), r2(-2 + Math.sin(k / 9 + i) * 3 + k * 0.28), 2, Math.max(1, 5 - k / 14)); if (k % 11 === 4) ctx.fillRect(r2(x + dir * k * 0.9), r2(k * 0.28), 1, 8 + (k % 5)); }
@@ -702,4 +522,4 @@ function foreground(ctx, cam, time, world) {
 }
 
 export function renderAsh(ctx, time) { const cam = { x: time * 6, y: 640 }; ashFall(ctx, cam, time, { ashUp: false }, 0); ashFall(ctx, cam, time, { ashUp: false }, 1); }
-export { light, drawVignette };
+export { light };

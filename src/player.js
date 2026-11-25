@@ -79,6 +79,7 @@ export class Player {
     for (let ty = Math.floor(top / TILE); ty <= Math.floor((this.y + this.h - 1) / TILE); ty++) for (let tx = l; tx <= r; tx++) if (this.world.level.solid(tx, ty)) return false;
     return true;
   }
+  piso() { const l = this.world.level, tx = Math.floor(this.cx() / TILE), ty = Math.floor((this.y + this.h + 2) / TILE); for (const [a, b, wy] of l.water || []) if (tx >= a && tx <= b && this.feet() > wy) return 'agua'; if (l.oneway(tx, ty)) return 'madeira'; return l.isCave(tx, ty - 1) ? 'pedra' : l.matAt(tx, ty) === 'telha' ? 'madeira' : 'neve'; }
   isLow() { return this.action === 'dodge' || this.action === 'slide' || this.action === 'crawl'; }
 
   cx() { return this.x + this.w / 2; }
@@ -224,7 +225,7 @@ export class Player {
     if (this.onGround && Math.abs(this.vx) > 10) {
       const before = Math.floor(this.walkPhase);
       this.walkPhase += dt * Math.abs(this.vx) * 0.085;
-      if (!this.action && Math.floor(this.walkPhase) !== before && Math.floor(this.walkPhase) % 5 === 0) { sfx.step(); w.fx.dust(this.cx() - this.facing * 4, this.feet(), -this.facing, 2); }
+      if (!this.action && Math.floor(this.walkPhase) !== before && Math.floor(this.walkPhase) % 5 === 0) { sfx.step(this.piso()); w.fx.dust(this.cx() - this.facing * 4, this.feet(), -this.facing, 2); }
     }
     // rastros de velocidade
     if ((this.action === 'dodge' || this.action === 'ability' || (this.action === 'light' && this.cur === 'D')) && w.time - (this.lastGhost || 0) > 0.035) { this.lastGhost = w.time; this.ghosts.push({ x: this.cx(), y: this.feet(), n: this.an.n, f: this.an.f, facing: this.facing, t: 0.22 }); }
@@ -275,7 +276,7 @@ export class Player {
       if (lv.solid(hx, yy - 1) || lv.solid(hx, yy - 2)) continue;
       this.start('climb'); this.facing = dir; this.vx = this.vy = 0;
       this.climb = { x0: this.x, y0: this.y, x1: dir > 0 ? tx * TILE + 2 : (tx + 1) * TILE - this.w - 2, y1: top - this.h };
-      sfx.step();
+      sfx.step(this.piso());
       return;
     }
   }

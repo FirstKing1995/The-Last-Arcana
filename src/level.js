@@ -29,13 +29,23 @@ export const ROOMS = [
 export class Level {
   constructor() {
     this.g = Array.from({ length: H }, () => Array(W).fill('.'));
-    this.spawns = []; this.props = []; this.caves = [];
+    this.spawns = []; this.props = []; this.caves = []; this.ver = 0; this.mats = []; this.backs = []; this.posts = []; this.walls = [];
     this.build();
   }
 
   fill(x0, x1, y0, y1, c) {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (y >= 0 && y < H && x >= 0 && x < W) this.g[y][x] = c;
+    this.ver++;
   }
+  // aparência (não muda a colisão): material da pedra, parede de fundo e pilares de apoio
+  mat(x0, x1, y0, y1, m) { this.mats.push([x0, x1, y0, y1, m]); }
+  back(x0, x1, y0, y1, m = 'tijolo') { this.backs.push([x0, x1, y0, y1, m]); }
+  post(x0, x1, y) { this.posts.push([x0, y, x1]); }
+  wall(x0, x1, y0, y1, m) { this.walls.push([x0, x1, y0, y1, m]); }
+  look(list, tx, ty) { for (let i = list.length - 1; i >= 0; i--) { const r = list[i]; if (tx >= r[0] && tx <= r[1] && ty >= r[2] && ty <= r[3]) return r[4]; } return null; }
+  matAt(tx, ty) { return this.look(this.mats, tx, ty) || 'rocha'; }
+  backAt(tx, ty) { return this.look(this.backs, tx, ty); }
+  wallTex(tx, ty) { return this.look(this.walls, tx, ty) || 'parede'; }
   ground(x0, x1, top) { this.fill(x0, x1, top, G - 1, '#'); }
   carve(x0, x1, y0, y1) { this.fill(x0, x1, y0, y1, '.'); this.caves.push([x0, y0, x1, y1]); }
   plat(x0, x1, y) { this.fill(x0, x1, y, y, '='); }
@@ -84,7 +94,7 @@ export class Level {
     // A04 Galeria Carbonizada: duelo com um Braseiro entre colunas
     this.fill(122, 152, 38, 41, '#'); this.caves.push([122, 42, 152, 49]);
     for (const x of [126, 134, 142, 149]) this.prop('column', x, G, { tall: 1 });
-    this.prop('torch', 130, 46); this.prop('torch', 146, 46);
+    this.prop('torch', 130, 46);
     this.prop('janela', 132, 47); this.prop('janela', 140, 47); this.prop('estandarte', 136, 46); this.prop('ossos', 128, G);
     this.spawn('braseiro', 138, G, { patrol: this.patrol(134, 142) });
     this.spawn('cinzeiro', 130, G); this.spawn('rasteja', 148, G);
@@ -189,8 +199,8 @@ export class Level {
     this.spawn('shrine', 284, TOP, { id: 'campanario', name: 'Pira do Campanário' });
     // D18 Antecâmara
     this.fill(291, 305, 12, 13, '#'); this.caves.push([292, 14, 304, 21]); this.fill(291, 291, 12, 16, '#');
-    this.fill(304, 304, 18, 21, 'K'); this.spawn('sign', 302, TOP, { id: 'chefe' }); this.prop('janela', 297, 20); this.prop('estatua', 293, TOP); this.prop('estandarte', 300, 19);
-    this.spawn('stone', 297, TOP, { id: 'antessala' }); this.prop('torch', 294, 17); this.prop('torch', 301, 17);
+    this.fill(304, 304, 18, 21, 'K'); this.spawn('sign', 302, TOP, { id: 'chefe' }); this.prop('janela', 297, 20); this.prop('estatua', 293, TOP); this.prop('estandarte', 294, 19);
+    this.spawn('stone', 297, TOP, { id: 'antessala' }); this.prop('torch', 301, 18);
 
     // ================= ARENA: Campanário Caído (3,5 telas) =================
     this.arena = { x0: 306 * TILE, x1: (W - 4) * TILE, gateX: 305, gateY: 18, trigger: 317 * TILE, floor: TOP, plats: [320, 347, 375] };
@@ -203,6 +213,55 @@ export class Level {
     this.spawn('portal', 386, TOP, { id: 'portal' });
 
     this.buildCrypt();
+    this.dress();
+  }
+
+  // Acabamento visual: materiais, fachadas sob os telhados, apoios e adereços encaixados
+  dress() {
+    const X = (x) => x + CX, Y = (y) => y + CY, T = 'tijolo';
+    // materiais
+    this.mat(20, 28, 48, 49, T); this.mat(94, 102, 48, 49, T);
+    this.mat(122, 152, 38, 41, T); this.mat(122, 152, 38, 38, 'telha');
+    this.mat(190, 199, 10, 45, T); this.mat(174, 181, 41, 42, 'telha'); this.mat(159, 174, 32, 33, 'telha'); this.mat(159, 166, 27, 27, 'telha'); this.mat(159, 159, 28, 31, T); this.mat(166, 166, 28, 31, T); this.mat(183, 188, 27, 28, 'telha');
+    this.mat(248, 253, 44, 45, T); this.mat(241, 246, 35, 36, T); this.mat(259, 262, 26, 27, T); this.mat(263, 264, TOP, 49, T);
+    this.mat(291, 305, 0, 17, T); this.mat(118, 128, 70, 77, T); this.mat(111, 111, 68, 72, T); this.mat(98, 99, 89, 93, T); this.mat(112, 113, 88, 93, T); this.mat(130, 130, 84, 89, T); this.mat(167, 167, 82, 89, T); this.mat(168, 173, 94, 97, T); this.mat(200, 206, 94, 97, T);
+    for (const x of [79, 87, 95]) this.mat(X(x), X(x), Y(29), Y(31), T);
+    for (const x of [100, 70, 40]) this.mat(X(x), X(x), Y(23), Y(28), T);
+    // paredes de dentro
+    this.wall(122, 152, 42, 49, T); this.wall(292, 304, 14, 21, T); this.wall(183, 187, 50, 71, T); this.wall(150, 187, 72, 77, 'rocha'); this.wall(168, 206, 84, 97, 'rocha'); this.wall(226, 231, 50, 81, T);
+    // casas sob os telhados e torre quebrada da subida
+    this.back(175, 180, 43, 49); this.back(160, 173, 34, 49); this.back(160, 165, 28, 31); this.back(249, 252, 46, 49); this.back(242, 245, 37, 49); this.back(259, 262, 28, 49);
+    this.post(183, 188, 28);
+    for (const [x, y] of [[163, 46], [168, 46], [172, 40], [164, 40], [178, 47], [243, 46], [244, 41], [251, 49], [260, 34], [261, 41], [260, 47]]) this.prop('jan2', x, y);
+    // ---- adereços de fora ----
+    const P = (t, ...xs) => { for (const q of xs) { const [x, y, e] = Array.isArray(q) ? q : [q, G]; this.prop(t, x, y === undefined ? G : y, e || {}); } };
+    P('murinho', 4, [33, G, { flip: 1 }], [92, G], 117, 168, [235, G, { flip: 1 }]);
+    P('lapide', 9, [35, G, { flip: 1 }], 87, [93, G, { flip: 1 }], 165, 209, [270, TOP]);
+    P('cruz', 18, 88, 166, 216, [276, TOP]);
+    P('lanca', [21, 49], [96, 48], 220, [275, TOP], [330, TOP], [359, TOP, { flip: 1 }]);
+    P('cerca', 37, [82, G], 158, 228, [266, TOP]);
+    P('placa', 38, 181); P('lampiao', 51, [69, G, { flip: 1 }], 119, [281, TOP], [288, TOP, { flip: 1 }]);
+    P('carroca', 80, 104, 203); P('lenha', 68, 172); P('barrilq', 71, 106, 179, [201, 94]); P('varal', 60, 177);
+    P('entulho', 113, 246, [309, TOP], [365, TOP], [380, TOP, { flip: 1 }]); P('gelo', 27, 101, 258, [277, TOP], [341, TOP], [371, TOP]);
+    P('moita', 13, 84, 157, 225, [269, TOP], [325, TOP]); P('cabeca', [337, TOP], [116, 94], [231, 94]);
+    // ---- adereços de dentro ----
+    P('candelabro', 128, 144, [139, 78], [91, 78], [133, 94], [295, TOP], [X(16), Y(32)], [X(30), Y(32)], [X(62), Y(32)]);
+    P('velas', 133, [160, 78], [96, 78], [90, 94], [207, 94], [299, TOP], [X(50), Y(32)], [X(112), Y(32)]);
+    P('armas', 147, [132, 78], [229, 94]); P('estante', [X(34), Y(32)], [163, 94], [114, 78]); P('altar', 130, [110, 78], [X(20), Y(32)]);
+    P('correntes', 124, [166, 78], [124, 94], [149, 94], [209, 94], [X(39), Y(32)], [X(118), Y(32)]); P('desabe', [186, 78], [101, 94], [X(98), Y(32)], [X(75), Y(32)]);
+    P('nicho', [152, 76], [92, 76], [128, 92], [170, 92], [204, 92], [X(115), Y(30)], [X(84), Y(30)]); P('suporte', [135, 73], [117, 91], [155, 88], [X(48), Y(29)], [X(120), Y(29)]);
+    // pendurados: y é o teto
+    const Hg = (t, ...xs) => { for (const [x, y] of xs) this.prop(t, x, y, { top: 1 }); };
+    Hg('lustre', [145, 42], [100, 68], [137, 82], [217, 82], [298, 14], [X(110), Y(26)], [X(55), Y(26)], [X(25), Y(23)]);
+    Hg('raizes', [155, 72], [175, 72], [95, 84], [118, 84], [181, 84], [196, 84], [X(76), Y(26)], [X(92), Y(26)]);
+    Hg('trapo', [128, 42], [139, 67], [229, 82], [106, 68], [X(45), Y(26)], [X(106), Y(26)], [302, 14]);
+    this.water = [[174, 199, 97 * TILE + 7]];
+    for (let y = 40; y < H - 1; y++) for (let x = 2; x < W - 2; x++) {
+      if (!this.isCave(x, y) || this.get(x, y) !== '.' || this.get(x, y - 1) !== '#') continue;
+      const h = Math.abs(Math.sin(x * 91.7 + y * 37.3) * 43758.5) % 1;
+      if (h > 0.45 && this.get(x - 1, y) === '#') this.props.push({ type: 'teia', x: x * TILE, y: y * TILE, top: 1 });
+      else if (h > 0.45 && this.get(x + 1, y) === '#') this.props.push({ type: 'teia', x: (x + 1) * TILE, y: y * TILE, top: 1, flip: 1 });
+    }
   }
 
   // Cripta do Campanário: 4 salas, opcional, com o mesmo desenho de antes
@@ -244,7 +303,7 @@ export class Level {
     if (ty >= H) return '#';
     return this.g[ty][tx];
   }
-  set(tx, ty, c) { if (tx >= 0 && tx < W && ty >= 0 && ty < H) this.g[ty][tx] = c; }
+  set(tx, ty, c) { if (tx >= 0 && tx < W && ty >= 0 && ty < H) { this.g[ty][tx] = c; this.ver++; } }
   solid(tx, ty) { const c = this.get(tx, ty); return c !== '.' && c !== '='; }
   oneway(tx, ty) { return this.get(tx, ty) === '='; }
   isCave(tx, ty) {
@@ -277,5 +336,5 @@ export class Level {
 
   setGate(closed) { const a = this.arena; this.fill(a.gateX, a.gateX, a.gateY, a.gateY + 3, closed ? 'G' : '.'); }
   openShortcut() { const [a, b] = this.crypt.trap; this.fill(a, b, G, G, '.'); }
-  replaceAll(from, to) { for (const row of this.g) for (let x = 0; x < W; x++) if (row[x] === from) row[x] = to; }
+  replaceAll(from, to) { for (const row of this.g) for (let x = 0; x < W; x++) if (row[x] === from) row[x] = to; this.ver++; }
 }

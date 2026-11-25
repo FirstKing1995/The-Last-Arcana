@@ -8,11 +8,13 @@ import { sfx, setMusicMode } from './audio.js';
 import { ARCANA, RELICS, RELIC_DROP, PLAYER, MOBS, WEAPONS, HERBS, BOSS } from './data.js';
 import { saveProgress, grantWeapon, masteryLevel } from './state.js';
 import { Input } from './input.js';
+import { VW, VH } from './view.js';
+import { vida } from './vida.js';
 
 // Nome do comando conforme teclado ou toque
 function k(key, touch) { return Input.touchMode ? touch : key; }
 
-export const VW = 384, VH = 216;
+export { VW, VH };
 
 const ELION_LINES = [
   ['Elion', 'Você acordou no meio da cinza... e ela não te queimou.'],
@@ -111,21 +113,21 @@ export class World {
     const p = this.player;
     if (this.tipQ && this.tipQ.length && !this.toasts.length) this.toast(...this.tipQ.shift());
     if (p.dead) return;
-    if (this.inCombat) this.tip('aviso', `Aviso amarelo: apare (${k('L', 'APARAR')}). Vermelho: esquive (${k('Shift', 'ESQUIVA')}).`, 6);
+    if (this.inCombat) this.tip('aviso', `Aviso amarelo: apare (${k('L', 'Aparar')}). Vermelho: esquive (${k('Shift', 'Esquivar')}).`, 6);
     if (p.vigor < 20) this.tip('vigor', 'Vigor baixo: pare de atacar um instante para recuperar.');
-    if (p.hp < p.maxHp * 0.5) this.tip('cura', `Beba uma poção (${k('Q', 'POÇÃO')}). ${k('R', 'TIPO')} troca entre Cura, Defesa e Dano.`);
-    if (this.finisherTarget()) this.tip('final', `Postura quebrada! Chegue perto e aperte ${k('E', 'E')} para finalizar.`);
+    if (p.hp < p.maxHp * 0.5) this.tip('cura', `Beba uma poção (${k('Q', 'Poção')}). ${k('R', 'Segurar a poção')} troca entre Cura, Defesa e Dano.`);
+    if (this.finisherTarget()) this.tip('final', `Postura quebrada! Chegue perto e aperte ${k('E', 'Finalizar')} para finalizar.`);
     const id = this.room && this.room.id, tx = p.cx() / TILE;
     if (id === 'A01') this.tip('andar', Input.touchMode ? 'Arraste o lado esquerdo da tela para andar.' : 'A/D anda, Espaço pula, Shift rola. Correndo, S desliza.', 6);
-    if (id === 'A01' && tx > 19) this.tip('bau', `Abra o baú com ${k('E', 'E')}: há uma arma dentro.`, 5);
-    if (this.prog.equipped && id === 'A01') this.tip('atacar', Input.touchMode ? 'ATACAR golpeia, PESADO carrega, APARAR defende.' : 'J ou clique: atacar. K ou botão direito: pesado. L: aparar. T: trocar de arma.', 8);
-    if (id === 'B05' && tx > 178) this.tip('poco', `Tábuas sobre um poço: ${k('S + Espaço', '↓ + PULAR')} desce por elas.`, 6);
+    if (id === 'A01' && tx > 19) this.tip('bau', `Abra o baú com ${k('E', 'o botão Abrir')}: há uma arma dentro.`, 5);
+    if (this.prog.equipped && id === 'A01') this.tip('atacar', Input.touchMode ? 'O botão grande ataca. Segure Pesado para carregar. Aparar defende no instante certo.' : 'J ou clique: atacar. K ou botão direito: pesado. L: aparar. T: trocar de arma.', 8);
+    if (id === 'B05' && tx > 178) this.tip('poco', `Tábuas sobre um poço: ${k('S + Espaço', 'analógico para baixo + Pular')} desce por elas.`, 6);
     if (id === 'B05' && tx > 157 && tx < 165) this.tip('cripta', 'Um arco antigo marca a Cripta do Campanário. É opcional.', 5);
     if (id === 'B09' && tx < 136 && tx > 128) this.tip('deslize', `Há um vão sob a pedra. Corra e segure ${k('S', '↓')} para deslizar por baixo.`, 6);
     if (id === 'C12') this.tip('mecanismo', 'A comporta responde a dois sinos. Encontre e puxe as duas alavancas.', 6);
     if (id === 'X1' && tx < 160) this.tip('sinos', 'Sinos sem badalo são falsos: tocam se você passar por baixo. Quebre-os ou passe esquivando.', 6);
     if (id === 'X2') this.tip('vento', 'Cinza soprada em ciclos: avance na calmaria e abrigue-se atrás dos pilares.', 6);
-    if (this.flags.bossDefeated && this.prog.arcana[0] === 'louco') this.tip('arcano', `O Louco: ${k('F', 'ARC')} usa Salto de Cinzas. Veja a maestria no inventário (${k('I', 'INV')}).`, 6);
+    if (this.flags.bossDefeated && this.prog.arcana[0] === 'louco') this.tip('arcano', `O Louco: ${k('F', 'O botão Arcano')} usa Salto de Cinzas. Veja a maestria no inventário (${k('I', 'bolsa')}).`, 6);
     // Marco de aproximação: o sino do campanário ecoa ao longe
     if (!this.flags.bossDefeated && (id === 'D16' || id === 'D17' || id === 'D18')) {
       this.bellT = (this.bellT || 0) - 1 / 60;
@@ -184,6 +186,7 @@ export class World {
   onMobKilled(m) {
     const d = MOBS[m.type] && m.def;
     if (!d) return;
+    this.fx.ashes(m.x - 4, m.y - 4, m.w + 8, m.h + 4);
     this.addCoins(d.coins || 0, m.cx(), m.y - 6);
     this.addMastery(4, 'kill');
     // A chave do chefe: o Sino-Fendido do pátio guarda o badalo que abre a porta (PROPOSTA, pedido do Pedro)
@@ -251,8 +254,7 @@ export class World {
   explode(x, y, radius, dmg, owner) {
     sfx.explode();
     this.shake = Math.max(this.shake, 4);
-    this.fx.burst(x, y - 6, 26, '#e17a3d', 130, 0.5, 150, 2);
-    this.fx.burst(x, y - 6, 10, '#3a2f2a', 70, 0.8, 40, 3);
+    this.fx.boom(x, y - 10, radius);
     if (owner === 'player') this.damageArea(x, y, radius, dmg);
   }
   damageArea(x, y, radius, dmg) {
@@ -345,7 +347,7 @@ export class World {
     sfx.rest();
     this.fx.burst(shrine.x, shrine.y - 10, 24, '#ffb070', 50, 1, -40, 2);
     this.toast(`Descansou: ${shrine.name} · progresso salvo`);
-    this.tip('preparo', `Na pira você prepara os frascos: escolha Cura, Defesa ou Dano em ${k('I', 'INV')} > Poções.`, 6);
+    this.tip('preparo', `Na pira você prepara os frascos: escolha Cura, Defesa ou Dano em ${k('I', 'bolsa')} > Poções.`, 6);
     this.save();
   }
 
@@ -384,7 +386,7 @@ export class World {
     }
     if (it.reward === 'weapon') {
       const r = grantWeapon(this.prog, it.weapon);
-      lines.push(['Baú', r === 'new' ? `Arma obtida: ${WEAPONS[it.weapon].name} (${WEAPONS[it.weapon].cat}). ${WEAPONS[it.weapon].desc} Já está na sua mão. ${k('T', 'ARMA')} troca entre as armas.` : `${WEAPONS[it.weapon].name} repetida: virou 1 Fragmento de Memória.`]);
+      lines.push(['Baú', r === 'new' ? `Arma obtida: ${WEAPONS[it.weapon].name} (${WEAPONS[it.weapon].cat}). ${WEAPONS[it.weapon].desc} Já está na sua mão. ${k('T', 'A barra da arma')} troca entre as armas.` : `${WEAPONS[it.weapon].name} repetida: virou 1 Fragmento de Memória.`]);
     }
     const coins = it.reward === 'coins' ? it.amount : it.coins;
     if (coins) { this.addCoins(coins, it.x, it.y - 14); lines.push(['Baú', `${coins} moedas.`]); }
@@ -607,6 +609,7 @@ export class World {
     this.boss.update(dt);
     this.fx.update(dt, this);
     this.updateCrypt(dt);
+    vida(this, dt);
     this.updateFauna(dt);
     this.updateLoot(dt);
     if (this.echo) { this.echo.t -= dt; if (this.echo.t <= 0) this.echo = null; }

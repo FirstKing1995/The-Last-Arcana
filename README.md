@@ -40,7 +40,7 @@ O Errante se agarra sozinho nas beiradas ao alcance e sobe degraus correndo.
 
 ### Celular
 
-Jogue com a tela deitada. Arraste o lado esquerdo da tela para mover. Os botões ficam à direita (PULAR, ATACAR, PESADO, ESQUIVA, APARAR, E, POÇÃO e TIPO) e no topo (pausa, INV, ⇄, ARC, ITEM, MAPA e ARMA). Correndo, puxe o analógico para baixo para deslizar. No Android, o jogo entra em tela cheia.
+Jogue com a tela deitada; o cenário ocupa a tela inteira. Analógico flutuante à esquerda (para baixo + Pular desce da tábua; correndo, desliza). À direita, o botão grande ataca com a arma da mão e as outras ações ficam em arco ao redor do polegar. Poção e item: toque usa, segurar troca. Aparar brilha em amarelo e Esquivar em vermelho quando o golpe pede. A barra de baixo troca de arma, o minimapa abre o mapa e o botão de ação só aparece perto de algo. Em **Opções** dá para mover, aumentar e mudar a opacidade de cada botão.
 
 ### Controle
 
@@ -50,6 +50,8 @@ A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT troca a poç
 
 - **Combate soulslike** com os custos de Vigor e Foco do Vol. V: ataques leve e pesado, esquiva com invulnerabilidade, esquiva perfeita, aparo, postura e finalização.
 - **5 mobs** do Vale com golpes próprios (brasa cuspida, pancada com onda, emboscada por baixo da fumaça, rajada e mergulho), variantes **Endurecidas** de contorno vermelho, patrulhas, alerta a aliados, territórios e reforço anunciado por sino.
+- **Interface** própria em bronze e ferro: HUD, minimapa, inventário em grade com ficha e comparação de armas, mapa com zoom, pausa, opções (som, qualidade, tremor, vibração) e editor de botões.
+- **Vale vivo**: capim que dobra, pegadas, fumaça, brasas, goteiras, água com reflexo, panos e correntes que balançam, revoadas, luz por ambiente e som de fogo, água, vento, martelo, corvos e eco nas criptas.
 - **Dificuldade alta**: vida, postura e dano ficam acima da tabela do manual por multiplicadores em `src/data.js` (`FORCA` e `ELITE`); pondo tudo em 1 volta ao valor canônico.
 - **Asgmor, O Louco** (8.500 PV), conforme a ficha do Vol. V, com 16 poses e mais dois golpes (garras e sino girado). Depois de vencê-lo, tocar o grande sino chama o eco dele para uma revanche.
 - **Cripta do Campanário**, a dungeon de 4 salas descrita no manual:

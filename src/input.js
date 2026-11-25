@@ -63,7 +63,7 @@ window.addEventListener('mousedown', (e) => {
   Input.onAny && Input.onAny();
 });
 window.addEventListener('mouseup', (e) => { codeDown.delete('Mouse' + e.button); });
-window.addEventListener('contextmenu', (e) => { if (Input.mouseOn && Input.mouseOn(e)) e.preventDefault(); });
+window.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('wheel', (e) => { if (Input.mouseOn && Input.mouseOn(e) && Math.abs(e.deltaY) > 10) pressTime.nextweapon = now(); }, { passive: true });
 window.addEventListener('blur', () => { codeDown.clear(); padDown.clear(); virtDown.clear(); });
 window.addEventListener('pointerdown', () => { Input.onAny && Input.onAny(); });
@@ -82,6 +82,7 @@ export const Input = {
     Input.onAny && Input.onAny();
   },
   virtualRelease(actions) { for (const a of actions) virtDown.delete(a); },
+  soltaTudo() { virtDown.clear(); },
   virtualHold(a, on) { if (on) virtDown.add(a); else virtDown.delete(a); },
   pressed(a, buffer = 0.14) {
     const t = pressTime[a];

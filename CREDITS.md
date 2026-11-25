@@ -11,8 +11,11 @@
 
 ## Arte
 - **Errante**: modelo 3D próprio, feito a partir da arte do Pedro (`tools/errante3d.py`), sobre o corpo base e as animações das bibliotecas **Universal Base Characters**, **Universal Animation Library 1 e 2** de **Quaternius**, CC0. Renderizado em pixel art por `tools/montar_errante.py`.
-- **Cenário, criaturas, NPCs, adereços e ícones**: gerados no Google Gemini com pedidos próprios, seguindo o manual (`tools/montar_ia.py`).
+- **Cenário, criaturas, NPCs, adereços, ícones e molduras da interface**: gerados no Google Gemini com pedidos próprios, seguindo o manual (`tools/montar_ia.py`).
 - **Capa**: gerada no ChatGPT a partir das imagens do Pedro.
+
+## Fontes
+- **Cinzel**, **Alegreya Sans** e **Silkscreen** (Google Fonts, licença OFL).
 
 ## Restante
 - **Asgmor**: desenho do Pedro; as 16 poses do jogo foram geradas no Google Gemini a partir da arte dele e montadas por `tools/montar_ia.py`.

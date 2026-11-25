@@ -2,6 +2,7 @@ import { overlap, TILE } from './physics.js';
 import { sfx } from './audio.js';
 import { r2 } from './hd.js';
 import { piece, has } from './art.js';
+import { cfg } from './config.js';
 
 // Partículas, números de dano, projéteis e perigos de cenário.
 export class FX {
@@ -14,6 +15,14 @@ export class FX {
       this.vis.push({ k: 'puff', x: x + (Math.random() - 0.5) * 8, y: y - Math.random() * 2, vx: d * (10 + Math.random() * 50), vy: -6 - Math.random() * 22, r: 1.5 + Math.random() * 3, t: 0, d: 0.28 + Math.random() * 0.3 });
     }
   }
+  smoke(x, y) { this.vis.push({ k: 'smoke', x, y, vx: 6 + Math.random() * 8, vy: -14 - Math.random() * 8, r: 2 + Math.random() * 2, t: 0, d: 2.6 + Math.random() * 1.6 }); }
+  boom(x, y, r) {
+    this.vis.push({ k: 'boom', x, y, r, t: 0, d: 0.36 });
+    for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, s = 60 + Math.random() * 160; this.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, life: 0.4 + Math.random() * 0.4, max: 0.7, color: Math.random() < 0.5 ? '#ffb060' : '#ff6a30', grav: 260, size: 1, streak: 1, glow: 1 }); }
+    for (let i = 0; i < 7; i++) this.smoke(x + (Math.random() - 0.5) * r, y - Math.random() * r * 0.6);
+  }
+  // o corpo se desfaz em cinza que sobe
+  ashes(x, y, w, h) { for (let i = 0; i < 34; i++) this.parts.push({ x: x + Math.random() * w, y: y + Math.random() * h, vx: (Math.random() - 0.5) * 24, vy: -10 - Math.random() * 46, life: 0.7 + Math.random() * 0.9, max: 1.5, color: Math.random() < 0.28 ? '#ff8a40' : Math.random() < 0.5 ? '#6a6662' : '#a8a29c', grav: -18, size: Math.random() < 0.4 ? 1 : 0.5, sway: 1 }); }
   ring(x, y, color, r) { this.vis.push({ k: 'ring', x, y, color, r, t: 0, d: 0.28 }); }
   shockRing(x, y) { this.vis.push({ k: 'shock', x, y, t: 0, d: 0.3 }); }
   charge(x, y, color) { const a = Math.random() * 6.28, r = 16 + Math.random() * 10; this.parts.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: -Math.cos(a) * r * 4, vy: -Math.sin(a) * r * 4, life: 0.22, max: 0.22, color, grav: 0, size: 1, glow: 1 }); }
@@ -32,7 +41,13 @@ export class FX {
         const r = v.r * (0.7 + q * 1.1); ctx.fillRect(r2(x - r), r2(y - r * 0.7), r2(r * 2), r2(r * 1.4)); ctx.fillRect(r2(x - r * 0.6), r2(y - r), r2(r * 1.2), r2(r * 2));
         continue;
       }
-      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - q; ctx.strokeStyle = ctx.fillStyle = v.color || '#ffe6c0';
+      if (v.k === 'smoke') { const r = v.r * (1 + q * 2.6); ctx.globalAlpha = 0.2 * Math.sin(Math.min(1, q * 1.2) * Math.PI); ctx.fillStyle = q < 0.3 ? '#5a5458' : '#8a868c'; ctx.beginPath(); ctx.arc(r2(x), r2(y), r, 0, 6.2832); ctx.fill(); continue; }
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - q;
+      if (v.k === 'boom') {
+        const e = 1 - (1 - q) * (1 - q);
+        for (const [c, m, a] of [['#d0401a', 1, 0.5], ['#ff8a3a', 0.72, 0.7], ['#fff0c8', 0.42, 0.9]]) { ctx.globalAlpha = a * (1 - q); ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i <= 14; i++) { const an = i / 14 * 6.2832, rr = v.r * m * (0.5 + e * 0.6) * (0.82 + 0.3 * Math.sin(i * 5.3 + v.x)); ctx.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr * 0.8); } ctx.fill(); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; continue;
+      } ctx.strokeStyle = ctx.fillStyle = v.color || '#ffe6c0';
       if (v.k === 'ring') { ctx.lineWidth = 2.5 * (1 - q) + 0.5; ctx.beginPath(); ctx.arc(x, y, v.r * (0.25 + 0.75 * (1 - (1 - q) * (1 - q))), 0, 6.2832); ctx.stroke(); } else if (v.k === 'shock') { ctx.lineWidth = 3 * (1 - q) + 0.5; ctx.beginPath(); ctx.ellipse(x, y - 1, 12 + 56 * q, 3 + 7 * q, 0, 0, 6.2832); ctx.stroke(); } else if (v.k === 'cut') {
         const l = v.len * (0.5 + q), w = 3.2 * (1 - q); ctx.save(); ctx.translate(x, y); ctx.rotate(v.a);
         ctx.beginPath(); ctx.moveTo(-l, 0); ctx.lineTo(0, -w); ctx.lineTo(l, 0); ctx.lineTo(0, w); ctx.fill();
@@ -64,7 +79,7 @@ export class FX {
 
   update(dt, world) {
     for (const p of this.parts) {
-      p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+      p.vy += p.grav * dt; p.x += (p.vx + (p.sway ? Math.sin(p.life * 5 + p.y * 0.1) * 12 : 0)) * dt; p.y += p.vy * dt; p.life -= dt;
     }
     this.parts = this.parts.filter((p) => p.life > 0);
     for (const n of this.nums) { n.vy = (n.vy === undefined ? -60 : n.vy) + 150 * dt; n.x += (n.vx || 0) * dt; n.y += n.vy * dt; n.life -= dt; n.pop = (n.pop || 0) + dt; }
@@ -89,14 +104,17 @@ export class FX {
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     this.drawVis(ctx, cam);
-    ctx.font = '8px Silkscreen, monospace';
-    ctx.textAlign = 'center';
-    for (const n of this.nums) {
-      ctx.globalAlpha = Math.min(1, n.life * 2);
-      ctx.fillStyle = '#000';
-      ctx.fillText(n.text, r2(n.x - cam.x) + 1, r2(n.y - cam.y) + 1);
-      ctx.fillStyle = n.color;
-      ctx.fillText(n.text, r2(n.x - cam.x), r2(n.y - cam.y));
+    if (cfg.numeros) {
+      ctx.textAlign = 'center';
+      for (const n of this.nums) {
+        const big = +n.text >= 200, pop = 1 + Math.max(0, 0.14 - (n.pop || 0)) * 5, x = r2(n.x - cam.x), y = r2(n.y - cam.y);
+        ctx.globalAlpha = Math.min(1, n.life * 2);
+        ctx.save(); ctx.translate(x, y); ctx.scale(pop, pop);
+        ctx.font = `${big ? 12 : 8}px Silkscreen, monospace`;
+        ctx.fillStyle = '#0a070a'; for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.fillText(n.text, a, b);
+        ctx.fillStyle = big ? '#ffd98a' : n.color; ctx.fillText(n.text, 0, 0);
+        ctx.restore();
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -144,12 +162,11 @@ export class Projectile {
   draw(ctx, cam) {
     const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
     if (this.icon && has(this.icon)) { piece(ctx, this.icon, x, y + 6, { scale: 0.8, rot: this.x * 0.06 }); return; }
-    ctx.fillStyle = this.glow;
-    ctx.globalAlpha = 0.35;
-    ctx.fillRect(x - this.r - 1, y - this.r - 1, this.r * 2 + 2, this.r * 2 + 2);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = this.color;
-    ctx.fillRect(x - this.r, y - this.r, this.r * 2, this.r * 2);
+    const v = Math.hypot(this.vx, this.vy) || 1, ux = this.vx / v, uy = this.vy / v;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 5; i >= 0; i--) { const k = 1 - i / 6, R = this.r * (0.5 + k * 0.8); ctx.globalAlpha = 0.22 + k * 0.3; ctx.fillStyle = i > 2 ? '#c03a18' : this.glow; ctx.beginPath(); ctx.arc(x - ux * i * 3, y - uy * i * 3 + Math.sin(this.life * 30 + i) * 0.5, R, 0, 6.2832); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.fillStyle = '#fff2d0'; ctx.beginPath(); ctx.arc(x, y, this.r * 0.55, 0, 6.2832); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
   }
 }
 
@@ -173,12 +190,12 @@ export class Shockwave {
   draw(ctx, cam) {
     const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
     const a = 1 - this.travelled / this.dist;
-    ctx.globalAlpha = 0.5 + a * 0.5;
-    ctx.fillStyle = this.color;
-    ctx.fillRect(x - 4, y - this.h, 8, this.h);
-    ctx.fillStyle = '#ffd9a0';
-    ctx.fillRect(x - 2, y - this.h + 2, 4, this.h - 2);
-    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 6; i++) {
+      const bx = x - this.dir * i * 4, hh = this.h * (1.5 - i * 0.2) * (0.8 + 0.25 * Math.sin(this.travelled * 0.35 + i * 2)), w = 5 - i * 0.5;
+      for (const [c, m, al] of [['#b03a18', 1, 0.45], ['#ff8a40', 0.7, 0.6], ['#fff0c0', 0.36, 0.8]]) { ctx.globalAlpha = al * (0.4 + a * 0.6) * (1 - i / 7); ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(bx - w * m, y); ctx.quadraticCurveTo(bx - w * m * 0.6, y - hh * m * 0.6, bx + this.dir * 3, y - hh * m); ctx.quadraticCurveTo(bx + w * m * 0.8, y - hh * m * 0.5, bx + w * m, y); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 }
 
@@ -193,8 +210,7 @@ export class AshPatch {
       this.dead = true;
       sfx.explode();
       world.shake = Math.max(world.shake, 3);
-      world.fx.burst(this.x, this.y - 6, 22, '#e17a3d', 120, 0.5, 150, 2);
-      world.fx.burst(this.x, this.y - 6, 12, '#625b58', 70, 0.8, 40, 3);
+      world.fx.boom(this.x, this.y - 10, this.radius * 0.95);
       if (this.owner === 'player') { world.damageArea(this.x, this.y, this.radius, this.dmg); return; }
       const p = world.player;
       const dx = Math.abs(p.cx() - this.x);
@@ -206,15 +222,15 @@ export class AshPatch {
     const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
     const arming = this.t > this.fuse - this.warn;
     const pulse = arming ? (Math.sin(this.t * 40) > 0 ? 1 : 0.6) : 1;
-    // círculo no chão
-    ctx.globalAlpha = 0.25 + (arming ? 0.35 : 0.1);
-    ctx.fillStyle = arming ? '#e17a3d' : '#9a918a';
-    ctx.fillRect(x - this.radius, y - 2, this.radius * 2, 2);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = arming ? (pulse > 0.8 ? '#ffb070' : '#e17a3d') : '#a59d95';
-    ctx.fillRect(x - 6, y - 3, 12, 3);
-    ctx.fillRect(x - 4, y - 5, 8, 2);
-    ctx.fillStyle = arming ? '#fff0c8' : '#c9c1b8';
-    ctx.fillRect(x - 1, y - 5, 2, 1);
+    const q = Math.min(1, this.t / this.fuse), R = this.radius;
+    // o chão racha e acende: quanto mais claro, mais perto de estourar
+    ctx.globalAlpha = 0.5; ctx.fillStyle = '#16120f'; ctx.beginPath(); ctx.ellipse(x, y, R, 3, 0, 0, 6.2832); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = (arming ? 0.55 : 0.2 + q * 0.2) * pulse; ctx.fillStyle = arming ? '#ff5a20' : '#8a3a18'; ctx.beginPath(); ctx.ellipse(x, y, R * (0.5 + q * 0.5), 2.5, 0, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = arming ? '#ffb060' : '#d06a38'; ctx.lineWidth = 0.5; ctx.globalAlpha = arming ? 0.9 : 0.45; ctx.beginPath(); ctx.ellipse(x, y, R, 3, 0, 0, 6.2832); ctx.stroke();
+    ctx.fillStyle = arming ? '#ffe0a0' : '#ff8a40';
+    for (let i = 0; i < 7; i++) { const px = x + ((i * 37 % 14) / 14 - 0.5) * R * 1.7, h = (arming ? 5 : 2) * (0.6 + 0.4 * Math.sin(this.t * 18 + i * 2)); ctx.globalAlpha = arming ? 0.8 : 0.4; ctx.fillRect(r2(px), r2(y - h), 1, r2(h)); }
+    if (arming) { const g = ctx.createLinearGradient(0, y - 34, 0, y); g.addColorStop(0, 'rgba(255,110,40,0)'); g.addColorStop(1, `rgba(255,120,50,${0.35 * pulse})`); ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(x - R * 0.8, y - 34, R * 1.6, 34); }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 }
