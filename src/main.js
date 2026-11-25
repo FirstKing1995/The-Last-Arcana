@@ -4,18 +4,21 @@ import { newProgress, loadProgress, hasSave, clearSave } from './state.js';
 import { setupUI, openMenu, isMenuOpen, menuKey } from './ui.js';
 import { World, VW, VH } from './world.js';
 import { renderWorld, renderBackdrop, text, light, drawVignette, FONT } from './render.js';
-import { drawErrante } from './sprites.js';
+import { drawErrante } from './art.js';
 import { setupTouch, tryFullscreenLandscape } from './touch.js';
+import { artReady } from './art.js';
+import { S } from './hd.js';
 
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+canvas.width = VW * S; canvas.height = VH * S;
+const ctx = canvas.getContext('2d', { alpha: false });
 if (document.fonts && document.fonts.load) document.fonts.load(`8px ${'Silkscreen'}`).catch(() => {});
 ctx.imageSmoothingEnabled = false;
 
 function fit() {
   // Escala inteira quando cabe (pixels nítidos); no celular, ocupa a tela toda.
   let s = Math.min(window.innerWidth / VW, window.innerHeight / VH);
-  if (s >= 2) s = Math.floor(s);
+  if (s >= 2) s = Math.floor(s * S) / S;
   canvas.style.width = VW * s + 'px';
   canvas.style.height = VH * s + 'px';
 }
@@ -29,17 +32,17 @@ Input.interceptor = (code) => (isMenuOpen() ? menuKey(code) : false);
 const CONTROLS = [
   ['A / D', 'mover'], ['W / Espaço', 'pular (S+Espaço desce)'], ['Shift', 'esquiva (segure: correr)'],
   ['J', 'ataque leve (combo)'], ['K', 'pesado (segure: carregar)'], ['L', 'aparar (parry)'],
-  ['Q', 'frasco de cura'], ['R', 'feitiço do grimório'], ['F', 'habilidade do Arcano'],
+  ['Q', 'beber a poção'], ['R', 'trocar a poção'], ['F', 'habilidade do Arcano'],
   ['Tab', 'trocar Arcano'], ['E', 'interagir / finalizar'], ['C / V', 'usar / trocar item rápido'],
-  ['I', 'inventário'], ['M', 'som liga/desliga'], ['Esc', 'pausa'],
+  ['I / N', 'inventário / mapa'], ['M', 'som liga/desliga'], ['Esc', 'pausa'],
 ];
 
 const TOUCH_CONTROLS = [
-  ['Esquerda', 'arraste para mover'], ['↓ + PULAR', 'desce da plataforma'], ['ESQUIVA', 'segure p/ correr'],
+  ['Esquerda', 'arraste para mover'], ['↓ + PULAR', 'desce da plataforma'], ['ESQUIVA', 'desliza; segure p/ correr'],
   ['ATACAR', 'combo de 3 golpes'], ['PESADO', 'segure para carregar'], ['APARAR', 'no aviso amarelo'],
-  ['CURA', 'frasco'], ['FOGO', 'feitiço'], ['ARC', 'habilidade Arcano'],
+  ['POÇÃO', 'beber'], ['TIPO', 'cura/defesa/dano'], ['ARC', 'habilidade Arcano'],
   ['⇄', 'trocar Arcano'], ['E', 'falar / finalizar'], ['ITEM', 'usa o item rápido'],
-  ['INV', 'inventário e equipamento'], ['❚❚', 'pausa'],
+  ['INV / MAPA', 'equipamento e mapa'], ['❚❚', 'pausa'],
 ];
 
 const game = { state: 'title', world: null, time: 0, deathT: 0, titleT: 0, sel: 0, confirmNew: false };
@@ -102,9 +105,9 @@ function update(dt) {
     case 'play': {
       if (Input.pressed('pause')) { Input.consume('pause'); game.state = 'pause'; break; }
       if (Input.pressed('mute')) { Input.consume('mute'); w.toast(toggleMute() ? 'Som desligado' : 'Som ligado'); }
-      if (!w.dialog && (Input.pressed('inventory') || w.menu)) {
-        const kind = w.menu || 'inventory';
-        Input.consume('inventory'); w.menu = null;
+      if (!w.dialog && (Input.pressed('inventory') || Input.pressed('map') || w.menu)) {
+        const kind = w.menu || (Input.pressed('map') ? 'map' : 'inventory');
+        Input.consume('inventory'); Input.consume('map'); w.menu = null;
         game.state = 'menu';
         openMenu(w, kind, () => { game.state = 'play'; Input.clear(); });
         break;
@@ -141,7 +144,7 @@ function update(dt) {
   }
 }
 
-const TITLE_HERO = { facing: 1, action: null, t: 0, flash: 0, invuln: 0, dead: false, onGround: true, vx: 0, vy: 0, walkPhase: 0, perfectFlash: 0, comboIndex: 0 };
+const TITLE_HERO = { facing: 1, action: null, t: 0, flash: 0, invuln: 0, dead: false, onGround: true, vx: 0, vy: 0, walkPhase: 0, perfectFlash: 0, comboIndex: 0, landT: 0 };
 function drawTitle() {
   const t = game.time;
   renderBackdrop(ctx, t * 10, t, { ashUp: false });
@@ -188,6 +191,8 @@ function render() {
   const now = performance.now();
   const dt = Math.min(0.1, (now - lastRender) / 1000);
   lastRender = now;
+  ctx.setTransform(S, 0, 0, S, 0, 0);
+  ctx.imageSmoothingEnabled = false;
   if (game.state === 'title') return drawTitle();
   renderWorld(ctx, game.world, game.time, dt);
   if (game.state === 'pause') {
@@ -223,5 +228,6 @@ function frame(now) {
     if (now - lastErr > 2000) { lastErr = now; console.error(e); }
   }
 }
-requestAnimationFrame(frame);
+artReady.then(() => requestAnimationFrame(frame));
 canvas.focus();
+game.update = update; game.render = render; // usado pelos testes automatizados

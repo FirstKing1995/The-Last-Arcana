@@ -11,12 +11,12 @@ Fonte: *The Last Arcana — Manual de Conteúdo, Recompensas e Sistemas* (Volume
 | Dois Arcanos, HUD com dois ícones fixos e recargas independentes (Vol. IV §9) | `prog.arcana`, `render.js` |
 | Maestria I–V (100/300/650/1.100/1.700), ganho reduzido ao repetir ação | `MASTERY`, `World.addMastery` |
 | O Louco: Salto de Cinzas (20 Foco), Risco Calculado, Caminho Improvável | `ARCANA.louco`, `Player.onPerfectDodge`, `World.spawnEcho` |
-| Grimório separado; fogo na região 1 (Brasa Lançada) | `SPELLS` |
-| Alquimia: 5 frascos (até 7), frasco consumido ao iniciar a animação | `PLAYER.heal`, `Player.updateAction('heal')` |
+| Magia elemental removida (24/11); três poções dividem os frascos | `POTIONS`, `Player.tryDrink` |
+| 5 frascos (até 7), consumidos ao iniciar a animação, recarga de 1,5 s | `PLAYER.drink`, `Player.updateAction('heal')` |
 | Bomba (220, recarga 12 s, máx. 3), óleo (45 s, +8%), selo de retorno | `ITEMS`, `Player.useItem` |
 | Armas regionais do Vale, 4% por fonte elegível; duplicatas viram Fragmentos | `WEAPONS`, `MOBS[].drop`, `grantWeapon` |
 | Arma-signatura: 35% / 15% / +10 p.p. por falha até 75% | `World.bossReward` |
-| Relíquias com 2 espaços; Cinza do Primeiro Passo garantida | `RELIC_SLOTS`, `ui.js` |
+| Relíquias com 2 espaços; Cinza do Primeiro Passo 18%, garantida na 6ª vitória | `RELIC_DROP`, `World.bossReward` |
 | Tabela dos 115 mobs, 01. Vale das Cinzas | `MOBS` + `src/enemies.js` |
 | Spawn fixo, patrulha de 2 pontos, alerta único a aliados, reforço anunciado, retorno ao território | `Mob.doPatrol`, `World.alertNear`, `Sino` |
 | Dungeon de 4 salas: Cripta do Campanário; silenciar o sino reduz reforços | `level.js`, `World.updateCrypt`, `SinoElite` |
@@ -47,7 +47,7 @@ Fonte: *The Last Arcana — Manual de Conteúdo, Recompensas e Sistemas* (Volume
 ## Estrutura
 
 ```
-index.html        canvas 480×270, escala inteira
+index.html        canvas 768×432 (mundo em unidades de 384×216)
 src/main.js       loop de 60 Hz, telas (título, pausa, morte)
 src/world.js      orquestra o nível, câmera, piras, diálogos e chefe
 src/level.js      mapa da região em tiles (16 px)
@@ -55,8 +55,11 @@ src/player.js     o Errante
 src/enemies.js    mobs
 src/boss.js       Asgmor
 src/fx.js         partículas, projéteis, ondas de choque, cinza retardada
-src/sprites.js    pixel art procedural
-src/render.js     cenário, tiles, HUD
+src/art.js        Errante e Asgmor (folhas em assets/sprites, geradas de arte do Pedro)
+src/hd.js         ampliação Scale2x/Scale3x com luz, cache de adereços
+src/scene.js      céu, parallax, marco do campanário e tiles
+src/sprites.js    mobs, NPCs e fauna por código
+src/render.js     adereços, luzes, HUD
 src/audio.js      sons sintetizados (WebAudio)
 src/data.js       números do manual
 src/state.js      progresso e salvamento local

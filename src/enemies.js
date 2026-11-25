@@ -109,7 +109,7 @@ export class Mob {
       this.onAggro && this.onAggro();
     }
     // Território: caçadores voltam depois de uma curta perseguição
-    if (this.aggro && (Math.abs(this.cx() - this.spawnX) > 260 || p.dead)) this.aggro = false;
+    if (this.aggro && (Math.abs(this.cx() - this.spawnX) > 260 || Math.abs(dy) > 150 || p.dead)) this.aggro = false;
     if (this.state === 'broken') {
       this.vx *= 0.9;
       if (this.t > 2.2) { this.set('recover'); this.posture = 0; }
@@ -174,14 +174,14 @@ export class Cinzeiro extends Mob {
     if (s === 'idle' || s === 'recover') {
       if (s === 'recover' && this.t < 0.4) { this.vx *= 0.85; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 26) { this.set('windup'); this.vx = 0; }
+      if (this.dist < 46) { this.set('windup'); this.vx = 0; }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
       if (this.t > 0.5) { this.set('strike'); this.vx = this.facing * 170; sfx.swing(); }
     } else if (s === 'strike') {
       this.vx *= 0.9;
-      this.melee(this.front(10), D.dmg, { parryable: true });
+      this.melee(this.front(14), D.dmg, { parryable: true });
       if (this.t > 0.18) this.set('retreat');
     } else if (s === 'retreat') {
       this.vx = -this.facing * 55;
@@ -206,21 +206,21 @@ export class Braseiro extends Mob {
       if (this.dist < 34) {
         this.vx = 0;
         if (r < 0.55) this.set('slashWind'); else if (r < 0.75) this.set('guard'); else this.set('lungeWind');
-      } else if (this.dist < 90 && r < 0.012) { this.vx = 0; this.set('lungeWind'); }
+      } else if (this.dist < 110 && r < 0.012) { this.vx = 0; this.set('lungeWind'); }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'slashWind') {
       this.vx = 0;
       if (this.t > 0.45) { this.set('slash'); this.vx = this.facing * 60; sfx.swing(); }
     } else if (s === 'slash') {
       this.vx *= 0.85;
-      this.melee(this.front(20, this.h - 4, 2), D.dmg, { parryable: true });
+      this.melee(this.front(30, this.h - 4, 2), D.dmg, { parryable: true });
       if (this.t > 0.16) this.set('recover');
     } else if (s === 'lungeWind') {
       this.vx = 0;
       if (this.t > 0.7) { this.set('lunge'); sfx.heavy(); }
     } else if (s === 'lunge') {
       this.vx = this.facing * 230;
-      this.melee(this.front(12, this.h - 4, 2), D.dmg + 20, { parryable: true, knock: 1.4 });
+      this.melee(this.front(18, this.h - 4, 2), D.dmg + 20, { parryable: true, knock: 1.4 });
       if (this.t > 0.3 || this.hitWall) { this.set('recover'); this.t = -0.3; }
     } else if (s === 'guard') {
       this.vx = 0;
@@ -240,14 +240,14 @@ export class Rasteja extends Mob {
     if (s === 'idle' || s === 'recover') {
       if (s === 'recover' && this.t < 0.6) { this.vx *= 0.8; return; }
       this.facing = Math.sign(this.dx) || this.facing;
-      if (this.dist < 30) { this.set('windup'); this.vx = 0; }
+      if (this.dist < 40) { this.set('windup'); this.vx = 0; }
       else this.walkToward(this.facing, D.speed);
     } else if (s === 'windup') {
       this.vx = 0;
       if (this.t > 0.35) { this.set('bite'); this.vx = this.facing * 210; sfx.swing(); }
     } else if (s === 'bite') {
       this.vx *= 0.93;
-      this.melee(this.front(8, 8, -1), D.dmg, { parryable: true });
+      this.melee(this.front(12, 11, -1), D.dmg, { parryable: true });
       if (this.t > 0.22) this.set('recover');
     }
   }
@@ -266,7 +266,10 @@ export class Gralha extends Mob {
   flinches() { return this.state === 'grounded'; }
   physics(dt) {
     if (this.dead) return;
-    this.x += this.vx * dt; this.y += this.vy * dt;
+    const lv = this.world.level, nx = this.x + this.vx * dt, ny = this.y + this.vy * dt;
+    const hit = (x, y) => lv.solid(Math.floor(x / TILE), Math.floor(y / TILE)) || lv.solid(Math.floor((x + this.w) / TILE), Math.floor(y / TILE)) || lv.solid(Math.floor(x / TILE), Math.floor((y + this.h - 1) / TILE)) || lv.solid(Math.floor((x + this.w) / TILE), Math.floor((y + this.h - 1) / TILE));
+    if (!hit(nx, this.y)) this.x = nx; else this.vx = 0;
+    if (!hit(this.x, ny)) this.y = ny; else this.vy = 0;
   }
   update(dt) {
     if (this.dead) { this.deathT += dt; this.y += 60 * dt; return; }
@@ -277,14 +280,15 @@ export class Gralha extends Mob {
   think(dt) {
     const p = this.world.player, s = this.state;
     this.groundY = this.world.level.solidGroundBelow(this.cx(), this.y + this.h);
-    const hoverY = this.groundY - 78 + Math.sin(this.world.time * 2.2 + this.spawnX) * 6;
+    let roof = Math.floor(this.y / TILE); while (roof > 0 && roof > this.y / TILE - 8 && !this.world.level.solid(Math.floor(this.cx() / TILE), roof)) roof--;
+    const hoverY = Math.max((roof + 1) * TILE + 6, this.groundY - 78) + Math.sin(this.world.time * 2.2 + this.spawnX) * 6;
     if (!this.aggro) {
       this.vx = (this.spawnX - this.cx()) * 1.2; this.vy = (hoverY - this.y) * 2;
       return;
     }
     this.facing = Math.sign(this.dx) || this.facing;
     if (s === 'hover' || s === 'idle' || s === 'recover') {
-      const tx = p.cx() - this.facing * 70;
+      const tx = p.cx() - this.facing * 84;
       this.vx = Math.max(-this.def.speed, Math.min(this.def.speed, (tx - this.cx()) * 1.5));
       this.vy = (hoverY - this.y) * 2.5;
       if (this.t > 1.6) {

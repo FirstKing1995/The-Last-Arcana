@@ -2,41 +2,49 @@
 // Custos de Vigor e Foco seguem a tabela "Economia de combate" do Volume V.
 export const PLAYER = {
   hp: 1000, vigor: 100, foco: 100, potions: 5, maxPotionsCap: 7,
-  walk: 85, run: 140, jump: 335,
+  walk: 88, run: 148, jump: 345,
+  w: 12, h: 30, hLow: 15,   // altura normal e altura no deslize (o cabelo e os espinhos não entram na colisão)
   light: { cost: 8, dur: 0.34, active: [0.09, 0.17] },
   heavy: { cost: 20, costCharged: 28, minCharge: 0.32, maxCharge: 0.85 },
   dodge: { cost: 18, dur: 0.36, iframes: [0.03, 0.27], speed: 235 },
   parry: { cost: 14, window: 0.2, dur: 0.45, foco: 8 },
   finisher: { dmg: 620, bossDmg: 900, cost: 15 },
-  heal: { pct: 0.35, time: 2.5, anim: 0.95 },
+  drink: { anim: 0.95, cd: 1.5 },
+  heal: { pct: 0.35, time: 2.5 },
 };
 
-export const SPELLS = {
-  brasa: { name: 'Brasa Lançada', cost: 18, dmg: 160, speed: 270, range: 0.62 },
+// Poções (Parte 1 §1, 24/11): só três tipos, dividindo os mesmos frascos. A magia elemental foi removida.
+export const POTIONS = {
+  cura: { name: 'Poção de Cura', short: 'CURA', desc: '35% da vida máxima ao longo de 2,5 s.', color: '#7fc48a', dark: '#4f8f5e' },
+  defesa: { name: 'Poção de Defesa', short: 'DEFESA', desc: '-15% de dano recebido por 45 s.', color: '#7fa8d8', dark: '#3f6a9a', dur: 45, mul: 0.85 },
+  dano: { name: 'Poção de Dano', short: 'DANO', desc: '+15% de dano causado por 45 s.', color: '#e0704a', dark: '#9a4028', dur: 45, mul: 1.15 },
 };
+export const POTION_IDS = ['cura', 'defesa', 'dano'];
+// Relíquia temática: chance por vitória, garantida na 6ª vitória sem obtê-la
+export const RELIC_DROP = { cinza: { chance: 0.18, pity: 6 } };
 
 // Armas regionais do Vale das Cinzas (catálogo de 42 armas, Vol. II §5).
 // combo: dano de cada golpe leve; reach: alcance em px; speed: multiplicador de velocidade.
 export const WEAPONS = {
   fio: {
     name: 'Fio do Peregrino', cat: 'Espada', rarity: 'Comum', chance: 0.04, where: 'Vale das Cinzas; baús iniciais',
-    desc: 'Corte rápido simples.', combo: [95, 95, 135], posture: [18, 18, 32], heavy: [230, 340], reach: 24, speed: 1, cost: 0,
+    desc: 'Corte rápido simples.', combo: [95, 95, 135], posture: [18, 18, 32], heavy: [230, 340], reach: 30, speed: 1, cost: 0,
   },
   lanca: {
     name: 'Lança de Cinza Longa', cat: 'Lança', rarity: 'Comum', chance: 0.04, where: 'Vale das Cinzas',
-    desc: 'Estocada simples de alcance.', combo: [85, 85, 120], posture: [15, 15, 28], heavy: [215, 320], reach: 36, speed: 0.95, cost: 0, thrust: true,
+    desc: 'Estocada simples de alcance.', combo: [85, 85, 120], posture: [15, 15, 28], heavy: [215, 320], reach: 44, speed: 0.95, cost: 0, thrust: true,
   },
   machado: {
     name: 'Machado de Lenhador Cinzento', cat: 'Machado', rarity: 'Comum', chance: 0.04, where: 'Vale das Cinzas',
-    desc: 'Golpe amplo e lento.', combo: [135, 135, 185], posture: [26, 26, 44], heavy: [310, 450], reach: 28, speed: 0.78, cost: 3, wide: true,
+    desc: 'Golpe amplo e lento.', combo: [135, 135, 185], posture: [26, 26, 44], heavy: [310, 450], reach: 34, speed: 0.78, cost: 3, wide: true,
   },
   agulhas: {
     name: 'Agulhas do Errante', cat: 'Adagas', rarity: 'Comum', chance: 0.04, where: 'Vale das Cinzas',
-    desc: 'Sequência rápida.', combo: [58, 58, 58, 58, 82], posture: [9, 9, 9, 9, 18], heavy: [170, 250], reach: 18, speed: 1.35, cost: -2,
+    desc: 'Sequência rápida.', combo: [58, 58, 58, 58, 82], posture: [9, 9, 9, 9, 18], heavy: [170, 250], reach: 23, speed: 1.35, cost: -2,
   },
   ruptura: {
     name: 'Ruptura', cat: 'Arma-signatura', rarity: 'Rara', chance: 0.35, where: 'Asgmor, O Louco (35% na 1ª vitória; +10 p.p. por falha, até 75%)',
-    desc: 'Após esquiva perfeita, o próximo golpe deixa cinza que explode depois de 0,8 s.', combo: [110, 110, 150], posture: [20, 20, 36], heavy: [250, 370], reach: 26, speed: 1, cost: 1, ash: true,
+    desc: 'Após esquiva perfeita, o próximo golpe deixa cinza que explode depois de 0,8 s.', combo: [110, 110, 150], posture: [20, 20, 36], heavy: [250, 370], reach: 33, speed: 1, cost: 1, ash: true,
   },
 };
 export const UPGRADE = { max: 5, dmgPerLevel: 0.06, coins: [150, 300, 500, 800, 1200], fragments: [0, 0, 1, 2, 3] };
@@ -79,12 +87,12 @@ export const MATERIALS = {
 
 // PV e funções conforme a tabela "Os 115 mobs" — 01. Vale das Cinzas
 export const MOBS = {
-  cinzeiro: { name: 'Cinzeiro Trôpego', role: 'Bucha de canhão', hp: 170, posture: 60, dmg: 110, w: 10, h: 12, speed: 55, coins: 8, drop: 'agulhas' },
-  braseiro: { name: 'Braseiro Oco', role: 'Intermediário', hp: 430, posture: 130, dmg: 165, w: 14, h: 22, speed: 45, coins: 22, drop: 'machado' },
-  rasteja: { name: 'Rasteja-Fumaça', role: 'Rastejador', hp: 250, posture: 60, dmg: 130, w: 18, h: 7, speed: 95, coins: 10, drop: 'agulhas' },
-  gralha: { name: 'Gralha de Fuligem', role: 'Voador', hp: 300, posture: 70, dmg: 120, w: 14, h: 10, speed: 70, coins: 12, drop: 'lanca' },
-  sino: { name: 'Sino-Fendido', role: 'Especialista', hp: 820, posture: 220, dmg: 200, w: 22, h: 28, speed: 0, coins: 45, drop: 'lanca' },
-  sinoElite: { name: 'Sino-Fendido Ancestral', role: 'Mini-chefe de dungeon', hp: 2800, posture: 420, dmg: 230, w: 26, h: 32, speed: 0, coins: 220 },
+  cinzeiro: { name: 'Cinzeiro Trôpego', role: 'Bucha de canhão', hp: 170, posture: 60, dmg: 110, w: 15, h: 18, speed: 58, coins: 8, drop: 'agulhas' },
+  braseiro: { name: 'Braseiro Oco', role: 'Intermediário', hp: 430, posture: 130, dmg: 165, w: 21, h: 33, speed: 48, coins: 22, drop: 'machado' },
+  rasteja: { name: 'Rasteja-Fumaça', role: 'Rastejador', hp: 250, posture: 60, dmg: 130, w: 26, h: 10, speed: 98, coins: 10, drop: 'agulhas' },
+  gralha: { name: 'Gralha de Fuligem', role: 'Voador', hp: 300, posture: 70, dmg: 120, w: 21, h: 14, speed: 74, coins: 12, drop: 'lanca' },
+  sino: { name: 'Sino-Fendido', role: 'Especialista', hp: 820, posture: 220, dmg: 200, w: 32, h: 40, speed: 0, coins: 45, drop: 'lanca' },
+  sinoElite: { name: 'Sino-Fendido Ancestral', role: 'Mini-chefe de dungeon', hp: 2800, posture: 420, dmg: 230, w: 40, h: 46, speed: 0, coins: 220 },
 };
 
 export const BOSS = { name: 'Asgmor, O Louco', hp: 8500, posture: 720, coins: 600, coinsRematch: 250 };

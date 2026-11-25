@@ -10,13 +10,13 @@ export class Asgmor extends Mob {
   constructor(world, x, y) {
     super(world, 'cinzeiro', x, y);
     this.def = { name: BOSS.name, hp: BOSS.hp, posture: BOSS.posture, speed: 90 };
-    this.w = 16; this.h = 30;
+    this.w = 24; this.h = 46;
     this.isBoss = true;
     this.bloodColor = '#e17a3d';
     this.reset();
   }
   reset() {
-    this.w = 16; this.h = 30;
+    this.w = 24; this.h = 46;
     super.reset();
     this.state = 'dormant'; this.phase = 1; this.history = []; this.leapsLeft = 0;
     this.bellSwing = 0; this.lastLand = null; this.trailT = 0; this.facing = -1;
@@ -70,7 +70,7 @@ export class Asgmor extends Mob {
   pick() {
     const d = this.dist;
     const opts = [];
-    if (d < 60) opts.push(['drag', 4], ['leap', 2], ['fan', 2]);
+    if (d < 72) opts.push(['drag', 4], ['leap', 2], ['fan', 2]);
     else if (d < 150) opts.push(['drag', 3], ['leap', 4], ['fan', 3]);
     else opts.push(['leap', 5], ['fan', 3], ['drag', 1]);
     if (this.phase === 2) opts.push(['roll', 3]);
@@ -109,7 +109,7 @@ export class Asgmor extends Mob {
             this.leapsLeft = this.phase === 2 ? 2 : 1;
             const onPlat = Math.random() < 0.3 && this.phase === 1;
             this.startLeap(onPlat ? this.nearestPlatformX() : p.cx(), onPlat ? 380 : 330, onPlat);
-          } else if (n === 'drag') this.set('dragWind');
+          } else if (n === 'drag') { this.bellSwing = this.phase === 2 ? 2 : 1; this.set('dragWind'); }
           else if (n === 'fan') this.set('fanHop');
           else if (n === 'roll') this.set('rollWind');
         }
@@ -121,7 +121,7 @@ export class Asgmor extends Mob {
           // Calcula salto balístico até o alvo
           const vy = -this.leapHeight;
           const g = 1100;
-          const gy = w.level.groundBelow(this.leapTarget, this.toPlatform ? 11 * TILE : this.y + this.h - 2);
+          const gy = w.level.groundBelow(this.leapTarget, this.toPlatform ? (w.level.arena.floor - 5) * TILE : this.y + this.h - 2);
           const dy = gy - (this.y + this.h);
           const disc = vy * vy + 2 * g * dy;
           const tFlight = (-vy + Math.sqrt(Math.max(0, disc))) / g;
@@ -137,7 +137,7 @@ export class Asgmor extends Mob {
           sfx.land(); w.shake = Math.max(w.shake, 4);
           w.fx.burst(this.cx(), this.y + this.h, 14, '#625b58', 80, 0.5, 80, 2);
           // Impacto pequeno ao pousar
-          if (Math.abs(p.cx() - this.cx()) < 26 && Math.abs(p.y + p.h - (this.y + this.h)) < 12) p.takeHit(150, this, { parryable: false, dir: Math.sign(p.cx() - this.cx()) || 1 });
+          if (Math.abs(p.cx() - this.cx()) < 32 && Math.abs(p.y + p.h - (this.y + this.h)) < 12) p.takeHit(150, this, { parryable: false, dir: Math.sign(p.cx() - this.cx()) || 1 });
           this.set('bellSway');
         }
         break;
@@ -146,7 +146,7 @@ export class Asgmor extends Mob {
         this.vx = 0;
         if (this.t > 0.7) {
           const gy = this.y + this.h;
-          w.fx.add(new AshPatch(this.cx(), gy, 0.01, 34, 190));
+          w.fx.add(new AshPatch(this.cx(), gy, 0.01, 40, 190));
           if (this.leapsLeft > 1) { this.leapsLeft--; this.startLeap(p.cx(), 300); }
           else this.set('recover');
         }
@@ -154,14 +154,14 @@ export class Asgmor extends Mob {
       case 'dragWind':
         this.vx = 0;
         this.facing = Math.sign(this.dx) || this.facing;
-        if (Math.random() < 0.4) w.fx.spark(this.cx() - this.facing * 10, this.y + this.h - 2, -this.facing, '#ffd27a', 1);
-        if (this.t > 0.6) { this.set('drag'); this.bellSwing = this.phase === 2 ? 2 : 1; sfx.swing(); }
+        if (Math.random() < 0.4) w.fx.spark(this.cx() - this.facing * 20, this.y + this.h - 2, -this.facing, '#ffd27a', 1);
+        if (this.t > 0.6) { this.set('drag'); sfx.swing(); }
         break;
       case 'drag': {
         // Investida arrastando o sino — aparável (aviso amarelo)
         this.vx = this.facing * 200;
-        if (Math.random() < 0.7) w.fx.spark(this.cx() - this.facing * 6, this.y + this.h - 1, -this.facing, '#ffd27a', 1);
-        this.melee({ x: this.facing > 0 ? this.x + this.w - 2 : this.x - 20, y: this.y + 8, w: 22, h: this.h - 8 }, 185, { parryable: true, knock: 1.3 });
+        if (Math.random() < 0.7) w.fx.spark(this.cx() - this.facing * 18, this.y + this.h - 1, -this.facing, '#ffd27a', 1);
+        this.melee({ x: this.facing > 0 ? this.x + this.w - 2 : this.x - 28, y: this.y + 14, w: 30, h: this.h - 14 }, 185, { parryable: true, knock: 1.3 });
         if (this.t > 0.42 || this.hitWall) {
           if (this.bellSwing > 1) { this.bellSwing--; this.set('dragWind'); this.t = 0.25; }
           else { this.set('recover'); this.t = -0.3; }
@@ -205,7 +205,7 @@ export class Asgmor extends Mob {
         this.vx = this.facing * 230;
         this.trailT -= dt;
         if (this.trailT <= 0) { this.trailT = 0.12; w.fx.add(new AshPatch(this.cx(), this.y + this.h, 1.2, 14, 150)); }
-        this.melee({ x: this.x, y: this.y + 10, w: this.w, h: this.h - 10 }, 170, { parryable: false });
+        this.melee({ x: this.x, y: this.y + 18, w: this.w, h: this.h - 18 }, 170, { parryable: false });
         if (this.t > 1.0 || this.hitWall) { this.set('recover'); this.t = -0.2; }
         break;
       }
@@ -226,7 +226,7 @@ export class Asgmor extends Mob {
   }
 
   nearestPlatformX() {
-    const xs = [184, 203, 222].map((t) => t * TILE + TILE / 2);
+    const xs = this.world.level.arena.plats.map((t) => t * TILE + TILE / 2);
     xs.sort((a, b) => Math.abs(a - this.cx()) - Math.abs(b - this.cx()));
     return xs[Math.random() < 0.5 ? 0 : 1];
   }

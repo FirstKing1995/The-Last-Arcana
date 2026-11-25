@@ -1,7 +1,7 @@
 import { Input } from './input.js';
 import { sfx } from './audio.js';
 import { moveBody, overlap, GRAVITY, TILE } from './physics.js';
-import { PLAYER, SPELLS, ARCANA, WEAPONS, ITEMS } from './data.js';
+import { PLAYER, POTIONS, POTION_IDS, ARCANA, WEAPONS, ITEMS } from './data.js';
 import { Projectile, AshPatch } from './fx.js';
 import { masteryLevel, weaponDamageMul } from './state.js';
 
@@ -9,7 +9,7 @@ export class Player {
   constructor(world, x, y) {
     this.world = world;
     this.prog = world.prog;
-    this.w = 10; this.h = 22;
+    this.w = PLAYER.w; this.h = PLAYER.h;
     this.maxHp = PLAYER.hp; this.maxVigor = PLAYER.vigor; this.maxFoco = PLAYER.foco;
     this.activeSlot = 0;
     this.cooldowns = {};
@@ -23,10 +23,12 @@ export class Player {
   weapon() { return WEAPONS[this.prog.equipped] || WEAPONS.fio; }
 
   respawn(x, y) {
+    this.h = PLAYER.h;
     this.x = x - this.w / 2; this.y = y - this.h;
     this.vx = 0; this.vy = 0;
     this.hp = this.maxHp; this.vigor = this.maxVigor; this.foco = this.maxFoco;
-    this.potions = this.maxPotions;
+    this.refill();
+    this.defBuff = 0; this.dmgBuff = 0; this.drinkCd = 0; this.landT = 0;
     this.facing = 1; this.action = null; this.t = 0;
     this.combo = 0; this.comboTimer = 0;
     this.healLeft = 0; this.healRate = 0;
@@ -36,6 +38,24 @@ export class Player {
     this.lastDodge = -99; this.lastEcho = -99; this.perfectFlash = 0;
     this.empowered = 0; this.ashCharge = 0; this.oil = 0; this.itemCd = 0;
     this.cooldowns = {};
+  }
+
+  // Frascos preparados na pira: três tipos dividem os mesmos espaços
+  refill() {
+    const pr = this.prog.prep, max = this.maxPotions;
+    let sum = POTION_IDS.reduce((s, k) => s + (pr[k] || 0), 0);
+    if (sum < max) pr.cura += max - sum;
+    while (sum > max) { const k = POTION_IDS.slice().reverse().find((q) => pr[q] > 0); pr[k]--; sum--; }
+    this.flasks = { ...pr };
+  }
+  get potions() { return POTION_IDS.reduce((s, k) => s + this.flasks[k], 0); }
+
+  // Deslize: a colisão fica baixa e só volta ao normal onde couber
+  setH(h) { this.y += this.h - h; this.h = h; }
+  canStand() {
+    const top = this.y + this.h - PLAYER.h, l = Math.floor(this.x / TILE), r = Math.floor((this.x + this.w - 0.01) / TILE);
+    for (let ty = Math.floor(top / TILE); ty <= Math.floor((this.y + this.h - 1) / TILE); ty++) for (let tx = l; tx <= r; tx++) if (this.world.level.solid(tx, ty)) return false;
+    return true;
   }
 
   cx() { return this.x + this.w / 2; }
@@ -88,6 +108,7 @@ export class Player {
       w.addMastery(3, 'parry');
       return 'parried';
     }
+    if (this.defBuff > 0) dmg = Math.round(dmg * POTIONS.defesa.mul);
     this.hp -= dmg;
     w.fx.number(this.cx(), this.y - 4, dmg, '#ff8a7a');
     w.fx.burst(this.cx(), this.cy(), 10, '#a72f2f', 70, 0.4);
@@ -125,6 +146,10 @@ export class Player {
     if (this.empowered > 0) this.empowered -= dt;
     if (this.ashCharge > 0) this.ashCharge -= dt;
     if (this.oil > 0) this.oil -= dt;
+    if (this.defBuff > 0) this.defBuff -= dt;
+    if (this.dmgBuff > 0) this.dmgBuff -= dt;
+    if (this.drinkCd > 0) this.drinkCd -= dt;
+    if (this.landT > 0) this.landT -= dt;
     if (this.itemCd > 0) this.itemCd -= dt;
     if (this.dropThrough > 0) this.dropThrough = Math.max(0, this.dropThrough - dt);
     if (this.comboTimer > 0) this.comboTimer -= dt; else this.combo = 0;
@@ -146,17 +171,20 @@ export class Player {
       this.hp = Math.min(this.maxHp, this.hp + a); this.healLeft -= a;
       if (Math.random() < 0.3) w.fx.parts.push({ x: this.x + Math.random() * this.w, y: this.y + this.h, vx: 0, vy: -30, life: 0.6, max: 0.6, color: '#9fe0a8', grav: 0, size: 1 });
     }
-    if (this.oil > 0 && Math.random() < 0.25) w.fx.parts.push({ x: this.cx() + this.facing * 8, y: this.y + 6 + Math.random() * 8, vx: 0, vy: -20, life: 0.3, max: 0.3, color: '#ffb070', grav: 0, size: 1 });
+    if (this.oil > 0 && Math.random() < 0.25) w.fx.parts.push({ x: this.cx() + this.facing * 12, y: this.y + 10 + Math.random() * 10, vx: 0, vy: -20, life: 0.3, max: 0.3, color: '#ffb070', grav: 0, size: 1 });
 
     const mx = (Input.down('right') ? 1 : 0) - (Input.down('left') ? 1 : 0);
     if (this.onGround) this.coyote = 0.1; else this.coyote -= dt;
 
+    const low = this.action === 'dodge' || this.action === 'crawl';
+    if (!low && this.h !== PLAYER.h) { if (this.canStand()) this.setH(PLAYER.h); else if (!this.dead) this.start('crawl'); }
     if (!this.action) this.freeControl(dt, mx);
     else this.updateAction(dt, mx);
 
     if (this.action !== 'ability') this.vy = Math.min(this.vy + GRAVITY * dt, 560);
     const vyBefore = this.vy;
     moveBody(this, w.level, dt);
+    if (this.justLanded && vyBefore > 200) this.landT = 0.1;
     if (this.justLanded && vyBefore > 300) { sfx.land(); w.fx.burst(this.cx(), this.y + this.h, 5, '#625b58', 30, 0.3, 50); }
     if (this.onGround && Math.abs(this.vx) > 10) {
       const before = Math.floor(this.walkPhase / Math.PI);
@@ -180,7 +208,7 @@ export class Player {
     if (Input.pressed('jump') && Input.down('down') && this.onGround && this.onOneWay()) {
       Input.consume('jump'); this.dropThrough = 0.25; this.y += 2; return;
     }
-    if (Input.pressed('jump') && this.coyote > 0) {
+    if (Input.pressed('jump') && this.coyote > 0 && this.h === PLAYER.h) {
       Input.consume('jump'); this.vy = -PLAYER.jump; this.coyote = 0; this.onGround = false; sfx.jump();
     }
     if (!Input.down('jump') && this.vy < -140) this.vy = -140;
@@ -191,18 +219,8 @@ export class Player {
     }
     if (Input.pressed('light') && this.vigor > 0) { Input.consume('light'); return this.doLight(); }
     if (Input.pressed('heavy') && this.vigor > 0 && this.onGround) { Input.consume('heavy'); this.start('heavyCharge'); sfx.charge(); return; }
-    if (Input.pressed('potion')) {
-      Input.consume('potion');
-      if (this.potions > 0) { this.start('heal'); this.healUsed = false; this.healStarted = false; } else w.toast('Sem frascos — descanse numa pira');
-      return;
-    }
-    if (Input.pressed('spell')) {
-      Input.consume('spell');
-      if (!w.prog.flags.brasa) w.toast('Nenhum feitiço aprendido ainda');
-      else if (this.foco < SPELLS.brasa.cost) w.toast('Foco insuficiente');
-      else { this.foco -= SPELLS.brasa.cost; this.start('cast'); }
-      return;
-    }
+    if (Input.pressed('potion')) { Input.consume('potion'); return this.tryDrink(); }
+    if (Input.pressed('nextpotion')) { Input.consume('nextpotion'); return this.nextPotion(); }
     if (Input.pressed('ability')) { Input.consume('ability'); return this.tryAbility(); }
     if (Input.pressed('swap')) {
       Input.consume('swap');
@@ -225,6 +243,19 @@ export class Player {
     this.foco -= ab.foco;
     this.cooldowns[a] = ab.cd * (this.mastery(a) >= 4 ? 0.95 : 1);
     this.start('ability'); sfx.dodge(); sfx.fire();
+  }
+
+  tryDrink() {
+    const w = this.world, id = this.prog.potion;
+    if (this.drinkCd > 0) return;
+    if (this.flasks[id] <= 0) return w.toast(this.potions > 0 ? `Sem ${POTIONS[id].name}: troque o tipo` : 'Sem frascos: descanse numa pira');
+    this.start('heal'); this.drinking = id; this.healUsed = false; this.healStarted = false;
+  }
+  nextPotion() {
+    const i = POTION_IDS.indexOf(this.prog.potion);
+    this.prog.potion = POTION_IDS[(i + 1) % POTION_IDS.length];
+    sfx.ui();
+    this.world.toast(`${POTIONS[this.prog.potion].name} (${this.flasks[this.prog.potion]})`, 1.4);
   }
 
   cycleItem() {
@@ -267,6 +298,7 @@ export class Player {
     this.spend(cost);
     if (mx) this.facing = mx;
     this.start('dodge');
+    this.setH(PLAYER.hLow);
     this.perfectThisDodge = false;
     this.vx = this.facing * PLAYER.dodge.speed;
     sfx.dodge();
@@ -293,10 +325,10 @@ export class Player {
     const f = this.facing, W = this.weapon();
     if (kind === 'heavy') {
       const reach = W.reach + 4;
-      return { x: f > 0 ? this.x + this.w - 2 : this.x - reach + 2, y: this.y - 8, w: reach, h: this.h };
+      return { x: f > 0 ? this.x + this.w - 2 : this.x - reach + 2, y: this.y - 8, w: reach, h: this.h - 4 };
     }
     if (kind === 'ability') return { x: this.x - 4, y: this.y, w: this.w + 8, h: this.h };
-    if (W.thrust) return { x: f > 0 ? this.x + this.w - 2 : this.x - W.reach + 2, y: this.y + 5, w: W.reach, h: this.h - 4 };
+    if (W.thrust) return { x: f > 0 ? this.x + this.w - 2 : this.x - W.reach + 2, y: this.y + 7, w: W.reach, h: this.h - 12 };
     const back = W.wide ? 6 : 0;
     return { x: f > 0 ? this.x + this.w - 2 - back : this.x - W.reach + 2, y: this.y + 1, w: W.reach + back, h: this.h };
   }
@@ -304,6 +336,7 @@ export class Player {
   damageMul() {
     let m = weaponDamageMul(this.prog, this.prog.equipped);
     if (this.oil > 0) m *= 1.08;
+    if (this.dmgBuff > 0) m *= POTIONS.dano.mul;
     if (this.empowered > 0) m *= 1.3;
     return m;
   }
@@ -380,6 +413,13 @@ export class Player {
         if (this.t >= P.dodge.dur) { this.action = null; this.t = 0.06; }
         break;
       }
+      case 'crawl': {
+        // sob uma passagem baixa: segue rente ao chão até caber de pé
+        const dir = mx || this.facing; this.facing = dir;
+        this.vx = dir * 70;
+        if (this.canStand()) { this.action = null; this.setH(PLAYER.h); }
+        break;
+      }
       case 'parry': {
         this.vx *= 0.7;
         if (this.t >= P.parry.dur) this.action = null;
@@ -395,25 +435,18 @@ export class Player {
         this.vx = mx * 30;
         if (!this.healUsed && this.t >= 0.05) {
           // o frasco é consumido ao iniciar a animação (Vol. V)
-          this.healUsed = true; this.potions--;
+          this.healUsed = true; this.flasks[this.drinking]--;
         }
         if (!this.healStarted && this.t >= 0.4) {
           this.healStarted = true;
-          this.healLeft = this.maxHp * P.heal.pct; this.healRate = this.healLeft / P.heal.time;
+          this.drinkCd = P.drink.cd;
+          if (this.drinking === 'cura') { this.healLeft = this.maxHp * P.heal.pct; this.healRate = this.healLeft / P.heal.time; }
+          else if (this.drinking === 'defesa') this.defBuff = POTIONS.defesa.dur;
+          else this.dmgBuff = POTIONS.dano.dur;
+          w.fx.burst(this.cx(), this.cy(), 12, POTIONS[this.drinking].color, 40, 0.7, -30, 1);
           sfx.heal();
         }
-        if (this.t >= P.heal.anim) { this.action = null; this.healStarted = false; }
-        break;
-      }
-      case 'cast': {
-        this.vx *= 0.8;
-        if (!this.struck && this.t >= 0.14) {
-          this.struck = true;
-          const S = SPELLS.brasa;
-          w.fx.add(new Projectile({ owner: 'player', x: this.cx() + this.facing * 8, y: this.y + 9, vx: this.facing * S.speed, vy: 0, r: 3, dmg: S.dmg, posture: 15, life: S.range, burn: true, color: '#ffb070', glow: '#e17a3d' }));
-          sfx.fire();
-        }
-        if (this.t >= 0.42) this.action = null;
+        if (this.t >= P.drink.anim) { this.action = null; this.healStarted = false; }
         break;
       }
       case 'throw': {
@@ -476,7 +509,7 @@ export class Player {
     this.start('finisher');
     this.finTarget = e;
     this.facing = Math.sign(e.cx() - this.cx()) || this.facing;
-    const nx = e.cx() - this.facing * (e.w / 2 + 10) - this.w / 2;
+    const nx = e.cx() - this.facing * (e.w / 2 + 14) - this.w / 2;
     const lvl = this.world.level;
     const tx = Math.floor((nx + (this.facing > 0 ? 0 : this.w)) / TILE);
     if (!lvl.solid(tx, Math.floor((this.y + 4) / TILE)) && !lvl.solid(tx, Math.floor((this.y + this.h - 2) / TILE))) this.x = nx;

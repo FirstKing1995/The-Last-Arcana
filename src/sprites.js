@@ -1,7 +1,9 @@
 // Pixel art dos personagens — segue a direção de arte do manual (Vol. III/IV):
 // silhueta legível, contorno escuro separando do cenário, 3–5 materiais com base/sombra/brilho,
 // saturação alta reservada para núcleo, perigo e itens interativos.
-import { PLAYER } from './data.js';
+// Mobs, NPCs e fauna: desenhados por código e ampliados (Scale3x) com volume de luz. O Errante e o Asgmor ficam em art.js.
+import { drawErrante } from './art.js';
+import { S, r2, upscale, canvas } from './hd.js';
 
 // ---------- infraestrutura ----------
 const spriteCache = new Map();
@@ -22,36 +24,21 @@ function sprite(name, rows, pal) {
 }
 
 const BW = 112, BH = 84, OX = 56, OY = 72;
-let buf, bctx, sil, sctx;
-function ensure() {
-  if (buf) return;
-  buf = document.createElement('canvas'); buf.width = BW; buf.height = BH; bctx = buf.getContext('2d');
-  sil = document.createElement('canvas'); sil.width = BW; sil.height = BH; sctx = sil.getContext('2d');
-}
+let buf, bctx;
 
-// Desenha um personagem num buffer, aplica contorno escuro e copia para a tela (espelhado conforme facing)
+// Desenha num buffer pequeno, amplia 3x (1,5x no mundo) com contorno e luz, e copia espelhado conforme facing
 function outlined(ctx, sx, sy, facing, draw, opts = {}) {
-  ensure();
+  if (!buf) [buf, bctx] = canvas(BW, BH, true);
   bctx.clearRect(0, 0, BW, BH);
   draw(bctx, OX, OY);
-  sctx.globalCompositeOperation = 'source-over';
-  sctx.clearRect(0, 0, BW, BH);
-  sctx.drawImage(buf, 0, 0);
-  sctx.globalCompositeOperation = 'source-in';
-  sctx.fillStyle = opts.outline || '#0a090c';
-  sctx.fillRect(0, 0, BW, BH);
-  sctx.globalCompositeOperation = 'source-over';
+  const n = opts.n || 3;
+  const s = upscale(bctx, BW, BH, { n, light: true, flash: opts.flash });
+  if (!s) return;
   ctx.save();
-  ctx.translate(Math.round(sx), Math.round(sy));
-  if (facing < 0) ctx.scale(-1, 1);
-  ctx.globalAlpha = opts.alpha === undefined ? 1 : opts.alpha;
-  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(sil, -OX + dx, -OY + dy);
-  if (opts.flash) {
-    sctx.globalCompositeOperation = 'source-in';
-    sctx.fillStyle = '#fff6ea'; sctx.fillRect(0, 0, BW, BH);
-    sctx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(sil, -OX, -OY);
-  } else ctx.drawImage(buf, -OX, -OY);
+  ctx.translate(r2(sx), r2(sy));
+  ctx.scale(facing < 0 ? -1 / S : 1 / S, 1 / S);
+  ctx.globalAlpha = opts.alpha === undefined ? 1 : Math.max(0, opts.alpha);
+  ctx.drawImage(s.c, s.x - OX * n, s.y - OY * n);
   ctx.restore();
 }
 
@@ -96,114 +83,6 @@ function slashArc(c, cx, cy, r, a0, a1, col) {
     if (k > 0.4) px(c, cx + Math.cos(a) * (r - 2), cy + Math.sin(a) * (r - 2), '#ffffff');
   }
   c.globalAlpha = 1;
-}
-
-// ---------- O Errante ----------
-const ERR_PAL = {
-  h: '#d6cfc0', H: '#9d9484', m: '#d4ccbe', M: '#f6f1e8', k: '#a59c8e', e: '#1a1418',
-  c: '#d6cfc0', l: '#efe9dd', s: '#a89f8e', d: '#7d7568', R: '#e0404a', r: '#a72f2f',
-};
-const ERR_BODY = [
-  '......hhhhh.....',
-  '.....hhhhhhh....',
-  '....HhhmmmmMh...',
-  '....HhmMMMMMm...',
-  '....HhmMkMMeM...',
-  '....HhmMkMMMM...',
-  '....HHhmMMMMm...',
-  '.....HHhmmmm....',
-  '....sslllccc....',
-  '...sscccccccl...',
-  '...ssccRRcccc...',
-  '...ssccrRcccc...',
-  '..sscccccccc....',
-  '..ssccccccccs...',
-  '.ssdcccccccs....',
-  '.sdssccccccs....',
-  'sdsssccccccs....',
-  'sd.sssccccss....',
-  'd..sdssccsds....',
-  '...d.sd.s.d.....',
-];
-const ERR_BODY_B = ERR_BODY.map((r, i) => (i >= 15 ? r.slice(1) + '.' : r)); // manto balançando
-
-const RUN = [[3, 0, -3, 1], [2, 1, -2, 0], [0, 2, 0, 0], [-3, 1, 3, 0], [-2, 0, 2, 1], [0, 0, 0, 2]];
-
-function legs(c, ox, oy, pose, tuck = 0) {
-  const [f, fl, b, bl] = pose;
-  // perna de trás (mais escura) e da frente
-  line(c, ox - 1, oy - 7 + tuck, ox + b - 1, oy - 1 - bl, '#1d1922', 2);
-  rect(c, ox + b - 2, oy - 1 - bl, 3, 1, '#151218');
-  line(c, ox + 1, oy - 7 + tuck, ox + f + 1, oy - 1 - fl, '#2e2834', 2);
-  px(c, ox + 1, oy - 6 + tuck, '#3d3644');
-  rect(c, ox + f, oy - 1 - fl, 3, 1, '#1d1922');
-}
-
-export function drawErrante(ctx, p, sx, sy, time, alphaMul = 1, outlineCol) {
-  const a = p.action, t = p.t;
-  const flash = p.flash > 0 && Math.floor(p.flash * 40) % 2 === 0;
-  let alpha = 1;
-  if (p.invuln > 0 && a !== 'hurt' && Math.floor(time * 30) % 2 === 0) alpha = 0.55;
-  if (p.dead) alpha = Math.max(0, 1 - p.deadT / 2.4);
-  const moving = p.onGround && Math.abs(p.vx) > 10 && !a;
-  const frame = moving ? Math.floor(p.walkPhase * 1.6) % 6 : 0;
-
-  outlined(ctx, sx, sy, p.facing, (c, ox, oy) => {
-    let bob = 0, tuck = 0, pose = [1, 0, -1, 0];
-    if (moving) { pose = RUN[frame]; bob = frame === 1 || frame === 4 ? -1 : 0; }
-    else if (!p.onGround) { pose = p.vy < 0 ? [2, 2, -2, 1] : [1, 0, -2, 2]; }
-    else if (!a) bob = Math.sin(time * 2.5) > 0.6 ? 1 : 0;
-    if (a === 'dodge') { tuck = 4; pose = [2, 1, -2, 1]; bob = 5; }
-    if (a === 'heavyCharge' || a === 'heal' || a === 'rest' || a === 'cast') { bob = a === 'rest' ? 4 : 1; pose = [3, 0, -3, 0]; }
-    if (a === 'light' || a === 'heavy') pose = [3, 0, -3, 0];
-    if (p.dead) { bob = Math.min(12, Math.round(p.deadT * 14)); tuck = Math.min(5, bob); }
-
-    legs(c, ox, oy, pose, tuck);
-    const body = Math.floor(time * 3) % 2 === 0 || moving ? ERR_BODY_B : ERR_BODY;
-    const spr = sprite(body === ERR_BODY ? 'err' : 'errB', body, ERR_PAL);
-    c.drawImage(spr, ox - 8, oy - 26 + bob);
-    // runa pulsante
-    if (Math.sin(time * 4) > 0.3) { px(c, ox - 1, oy - 16 + bob, '#ff8a7a'); }
-
-    // braço + arma
-    const shx = ox + 2, shy = oy - 17 + bob;
-    let ang = 1.15, len = 13, armA = 1.4;
-    if (a === 'light') {
-      const k = Math.min(1, t / PLAYER.light.active[1]);
-      const sw = [[-1.9, 0.9], [0.9, -1.6], [-2.3, 1.2]][p.comboIndex || 0];
-      ang = sw[0] + (sw[1] - sw[0]) * k; armA = ang * 0.7;
-      if (t > PLAYER.light.active[0] - 0.03 && t < PLAYER.light.active[1] + 0.07) slashArc(c, shx, shy + 2, 15, sw[0], ang, '#f4efe4');
-    } else if (a === 'heavyCharge') {
-      ang = -2.5; armA = -2.2; len = 15;
-      if (t >= PLAYER.heavy.maxCharge - 0.05 && Math.sin(time * 40) > 0) { px(c, shx + Math.cos(ang) * 16, shy + Math.sin(ang) * 16, '#ffd27a'); }
-    } else if (a === 'heavy') {
-      const k = Math.min(1, t / 0.14);
-      ang = -2.5 + 3.7 * k; armA = ang * 0.8; len = 15;
-      if (t < 0.22) slashArc(c, shx, shy + 2, 18, -2.5, ang, p.charged ? '#ffd27a' : '#f4efe4');
-    } else if (a === 'parry') {
-      ang = -1.0; armA = -0.6; len = 12;
-      if (t < PLAYER.parry.window) { c.globalAlpha = 0.6; rect(c, ox + 9, oy - 26, 2, 18, '#fff3c4'); c.globalAlpha = 1; }
-    } else if (a === 'cast') {
-      ang = 2.2; armA = 0; len = 11;
-      rect(c, shx + 5, shy - 1, 3, 3, '#ffb070'); px(c, shx + 6, shy, '#fff0c8');
-    } else if (a === 'dodge') { ang = 2.6; armA = 2.0; len = 11; }
-    else if (a === 'heal') { ang = 1.9; armA = -0.4; len = 11; rect(c, shx + 2, shy - 4, 3, 5, '#7fc48a'); px(c, shx + 3, shy - 5, '#d8d0c2'); }
-    else if (a === 'finisher') { ang = t < 0.3 ? -2.6 : 1.3; armA = ang * 0.8; len = 17; }
-    else if (a === 'ability') { ang = 0.25; armA = 0.2; len = 13; }
-    else if (a === 'rest') { ang = 1.57; armA = 1.3; len = 12; }
-    const hx = shx + Math.cos(armA) * 4, hy = shy + Math.sin(armA) * 4;
-    line(c, shx, shy, hx, hy, '#c9c0b2', 2);
-    blade(c, hx, hy, ang, len);
-    px(c, hx, hy, '#ece6dc');
-  }, { flash, alpha: alpha * alphaMul, outline: outlineCol });
-
-  if (p.perfectFlash > 0) {
-    ctx.globalAlpha = p.perfectFlash * 2.5;
-    ctx.fillStyle = '#f6f2ea';
-    ctx.fillRect(Math.round(sx) - 10, Math.round(sy) - 30, 20, 1);
-    ctx.fillRect(Math.round(sx) - 6, Math.round(sy) - 32, 12, 1);
-    ctx.globalAlpha = 1;
-  }
 }
 
 // ---------- Mobs do Vale das Cinzas ----------
@@ -364,122 +243,16 @@ export function drawMob(ctx, m, sx, sy, time) {
     }
   }, { flash, alpha });
 
-  if (m.isBroken()) brokenMark(ctx, sx, sy - m.h - 10, time);
+  if (m.isBroken()) brokenMark(ctx, sx, sy - m.h - 14, time);
 }
 
-function brokenMark(ctx, x, y, time) {
+export function brokenMark(ctx, x, y, time) {
   const col = Math.sin(time * 10) > 0 ? '#fff3c4' : '#ffd27a';
   ctx.fillStyle = '#0a090c';
   ctx.fillRect(Math.round(x) - 2, Math.round(y) - 1, 5, 10);
   ctx.fillStyle = col;
   ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 5);
   ctx.fillRect(Math.round(x) - 1, Math.round(y) + 6, 3, 2);
-}
-
-// ---------- Asgmor, O Louco ----------
-const ASG = [
-  '..H..............H..',
-  '..HH............HH..',
-  '...HH..........HH...',
-  '....HHhhhhhhhhHH....',
-  '.....hhmmmmmmmh.....',
-  '.....hmMMMMkMMm.....',
-  '.....hmMeMMkMeM.....',
-  '.....hmMMMMMkMM.....',
-  '.....hmMMMMMMMm.....',
-  '......hmmMMMmm......',
-  '.....ccctttttccc....',
-  '....ccCtttttttCcc...',
-  '....cCCtssssstCCc...',
-  '....cCttsttststCc...',
-  '....cCtttsttttCCc...',
-  '....ccCtttttttCcc...',
-  '.....cCtttttttCc....',
-  '.....cCttsstttCc....',
-  '.....cttttttttcc....',
-  '....cttttsttttttc...',
-  '....ctttttttsttcc...',
-  '...cttsttttttttttc..',
-  '...cct.tt.tt.tt.cc..',
-  '....c..t...t..t.....',
-];
-const ASG_PAL = { H: '#a89a80', h: '#c9b99e', M: '#d8d0bd', m: '#b8ae98', k: '#7d756a', e: '#151316', c: '#29272a', C: '#3a373b', t: '#c9b99e', s: '#a2937a' };
-const BELL = ['...nnn...', '..bBBBb..', '.bBBBBLb.', '.bBBBBLb.', '.bBBBBBb.', 'bbBBBBBbb', 'ooooooooo'];
-const BELL_PAL = { n: '#3a2a1e', b: '#6d4b32', B: '#8b633f', L: '#a97c52', o: '#e17a3d' };
-const BELL_HOT = { ...BELL_PAL, o: '#ffd27a', B: '#a97c52' };
-
-export function drawAsgmor(ctx, b, sx, sy, time) {
-  if (b.dead && b.deathT > 2.5) return;
-  const st = b.state;
-  const tel = b.telegraph();
-  const alpha = b.dead ? Math.max(0, 1 - b.deathT / 2.5) : 1;
-
-  outlined(ctx, sx, sy, b.facing, (c, ox, oy) => {
-    if (st === 'roll') {
-      const r = Math.floor(time * 18) % 4;
-      const rows = [[-8, -18, 16, 18, '#29272a'], [-7, -17, 14, 16, '#c9b99e']];
-      rows.forEach(([x, y, w, h, col]) => rect(c, ox + x, oy + y, w, h, col));
-      rect(c, ox - 3 + (r - 2) * 2, oy - 12, 7, 5, '#8b633f');
-      rect(c, ox - 2, oy - 8 + (r % 2), 4, 3, '#d8d0bd');
-      line(c, ox - 7, oy - 4, ox + 6, oy - 14, '#a2937a');
-      return;
-    }
-    let crouch = 0;
-    if (st === 'leapWind' || st === 'rollWind') crouch = 4;
-    if (st === 'broken') crouch = 6;
-    const air = !b.onGround;
-    // pernas finas e longas
-    const step = Math.abs(b.vx) > 5 && !air ? Math.floor(time * 10) % 2 : 0;
-    line(c, ox - 2, oy - 11 + crouch, ox - 4 - step * 2 + (air ? 2 : 0), oy - 1 - (air ? 3 : 0), '#1d1b1e', 2);
-    line(c, ox + 2, oy - 11 + crouch, ox + 4 + step * 2 - (air ? 1 : 0), oy - 1 - (air ? 1 : 0), '#29272a', 2);
-    rect(c, ox - 6 - step * 2, oy - 1, 4, 1, '#1d1b1e'); rect(c, ox + 3 + step * 2, oy - 1, 4, 1, '#29272a');
-    // sino nas costas (balança no bellSway)
-    const sway = st === 'bellSway' ? Math.round(Math.sin(b.t * 28) * 3) : Math.round(Math.sin(time * 2));
-    if (!(st === 'dragWind' || st === 'drag')) {
-      line(c, ox - 4, oy - 30 + crouch, ox - 9 + sway, oy - 26 + crouch, '#625b58');
-      c.drawImage(sprite(st === 'bellSway' ? 'bellH' : 'bell', BELL, st === 'bellSway' ? BELL_HOT : BELL_PAL), ox - 14 + sway, oy - 27 + crouch);
-    }
-    c.drawImage(sprite('asg', ASG, ASG_PAL), ox - 10, oy - 35 + crouch);
-    // braços longos
-    const shx = ox + 4, shy = oy - 23 + crouch;
-    let ang = 1.3;
-    if (st === 'fanWind') ang = -1.9 - Math.sin(b.t * 20) * 0.3;
-    else if (st === 'dragWind' || st === 'drag') ang = 0.9;
-    else if (st === 'leapWind') ang = 2.4;
-    else if (st === 'intro' || st === 'phaseShift') ang = -1.2 + Math.sin(time * 8) * 0.4;
-    const hx = shx + Math.cos(ang) * 10, hy = shy + Math.sin(ang) * 10;
-    line(c, shx, shy, hx, hy, '#c9b99e', 2);
-    line(c, shx + 1, shy, hx + 1, hy, '#a2937a', 1);
-    rect(c, hx - 1, hy - 1, 3, 3, '#d8d0bd');
-    line(c, ox - 4, shy + 1, ox - 8, shy + 9, '#a2937a', 2);
-    if (st === 'dragWind' || st === 'drag') {
-      // sino arrastado pela corrente
-      line(c, hx, hy, ox + 13, oy - 6, '#625b58');
-      c.drawImage(sprite('bell', BELL, BELL_PAL), ox + 10, oy - 7);
-    }
-    if (st === 'fanWind') {
-      c.globalAlpha = 0.8;
-      for (let i = 0; i < 5; i++) px(c, hx + Math.cos(time * 9 + i * 1.3) * 4, hy + Math.sin(time * 9 + i * 1.3) * 4, '#c9c1b8');
-      c.globalAlpha = 1;
-    }
-  }, { flash: b.flash > 0, alpha });
-
-  if (tel && Math.sin(time * 26) > -0.2) {
-    const col = tel === 'parry' ? '#ffd23a' : '#ff4a3a';
-    const x = Math.round(sx), y = Math.round(sy) - 46;
-    ctx.fillStyle = '#0a090c'; ctx.fillRect(x - 3, y - 1, 7, 7);
-    ctx.fillStyle = col; ctx.fillRect(x - 2, y, 5, 5);
-    ctx.fillStyle = '#fff6ea'; ctx.fillRect(x, y + 1, 1, 2); ctx.fillRect(x, y + 4, 1, 1);
-  }
-  if (st === 'leapWind' && b.leapTarget !== undefined) {
-    const lx = Math.round(sx + (b.leapTarget - b.cx()));
-    ctx.globalAlpha = 0.35 + 0.3 * Math.sin(time * 20);
-    ctx.fillStyle = '#ff4a3a';
-    ctx.fillRect(lx - 16, Math.round(sy) - 1, 32, 1);
-    ctx.fillRect(lx - 10, Math.round(sy) - 2, 20, 1);
-    ctx.globalAlpha = 1;
-  }
-  if (b.isBroken()) brokenMark(ctx, sx, sy - 50, time);
 }
 
 // ---------- Elion, o Guardião das Lembranças ----------
@@ -592,10 +365,10 @@ export function drawFauna(ctx, f, sx, sy, time) {
       if (flying) rect(c, ox - 2, flap ? oy - 7 : oy - 2, 4, 2, '#36333b');
       else { px(c, ox - 1, oy - 1, '#a65d38'); px(c, ox + 1, oy - 1, '#a65d38'); }
     }
-  });
+  }, { n: 2 });
 }
 
 export function drawEcho(ctx, e, sx, sy, time) {
-  const ghost = { facing: e.facing, action: null, t: 0, flash: 0, invuln: 0, dead: false, onGround: true, vx: 0, vy: 0, walkPhase: 0, perfectFlash: 0 };
+  const ghost = { facing: e.facing, action: null, t: 0, flash: 0, invuln: 0, dead: false, onGround: true, vx: 0, vy: 0, walkPhase: 0, perfectFlash: 0, landT: 0 };
   drawErrante(ctx, ghost, sx, sy, time, Math.min(0.55, e.t) * (0.8 + Math.sin(time * 20) * 0.2), '#d9b58a');
 }

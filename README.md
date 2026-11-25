@@ -2,7 +2,7 @@
 
 Soulslike 2D em pixel art, com visão lateral. O Errante, uma consciência nascida do vazio que Aurelian deixou ao aprisionar as almas luminosas, precisa libertar os 22 Arcanos corrompidos.
 
-Esta versão traz a **Região 1 completa, o Vale das Cinzas**: o povoado de Cinzeiral, a trilha, o fosso, as ruínas, a **Cripta do Campanário** e a luta contra **Asgmor, O Louco**. Tudo foi construído a partir do *Manual de Conteúdo, Recompensas e Sistemas* (Volumes II a V).
+Esta versão traz a **Região 1 completa, o Vale das Cinzas**: 18 salas em quatro setores, a **Cripta do Campanário** (opcional) e a luta contra **Asgmor, O Louco**. A auditoria da área está em [`docs/AREA_01_AUDITORIA.md`](docs/AREA_01_AUDITORIA.md). Tudo foi construído a partir do *Manual de Conteúdo, Recompensas e Sistemas* (Volumes II a V).
 
 ## Como jogar
 
@@ -23,27 +23,28 @@ O progresso é salvo no navegador ao descansar nas piras, abrir baús, comprar e
 |---|---|
 | A / D | mover |
 | W / Espaço | pular (segure para pular mais alto; S + Espaço desce da plataforma) |
-| Shift | esquiva com invulnerabilidade (segure para correr) |
+| Shift | esquiva com invulnerabilidade; desliza sob passagens baixas (segure para correr) |
 | J | ataque leve (combo) |
 | K | ataque pesado (segure para carregar) |
 | L | aparar (parry) |
-| Q | frasco de cura |
-| R | feitiço do grimório (Brasa Lançada) |
+| Q | beber a poção escolhida |
+| R | trocar a poção (Cura, Defesa, Dano) |
 | F | habilidade do Arcano ativo |
 | Tab | trocar Arcano primário/secundário |
 | C / V | usar / trocar o item rápido (bomba, óleo, selo) |
 | E | interagir, colher, finalizar inimigo com a postura quebrada |
-| I | inventário (armas, relíquias, itens, Arcanos) |
+| I | inventário (armas, poções, relíquias, itens, Arcanos) |
+| N | mapa |
 | M | som liga/desliga |
 | Esc | pausa |
 
 ### Celular
 
-Jogue com a tela deitada. Arraste o lado esquerdo da tela para mover. Os botões ficam à direita (PULAR, ATACAR, PESADO, ESQUIVA, APARAR, E, CURA e FOGO) e no topo (pausa, INV, ⇄, ARC e ITEM). No Android, o jogo entra em tela cheia.
+Jogue com a tela deitada. Arraste o lado esquerdo da tela para mover. Os botões ficam à direita (PULAR, ATACAR, PESADO, ESQUIVA, APARAR, E, POÇÃO e TIPO) e no topo (pausa, INV, ⇄, ARC, ITEM e MAPA). No Android, o jogo entra em tela cheia.
 
 ### Controle
 
-A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT feitiço, RT interage. Direcional: ↑ troca Arcano e ↓ bebe frasco. Select abre o inventário; L3 e R3 usam e trocam o item rápido.
+A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT troca a poção, RT interage. Direcional: ↑ troca Arcano e ↓ bebe frasco. Select abre o inventário; L3 e R3 usam e trocam o item rápido.
 
 ## O que tem nesta versão
 
@@ -59,6 +60,7 @@ A pula, B esquiva, X ataque leve, Y pesado, LB apara, RB Arcano, LT feitiço, RT
 - **Maestria I–V** de O Louco: Salto de Cinzas, Risco Calculado e Caminho Improvável.
 - **Aliados**: Elion conta a história; Morren vende bombas, óleos e selos e compra ervas; Ysara aprimora armas de +1 a +5.
 - **Mundo vivo**: coleta de Líquen de Brasa, Sálvia Cinzenta e Flor de Cinza (as raras voltam depois de dois descansos), vasos e caixas quebráveis, e fauna neutra que foge.
-- **Direção de arte do manual**: pixel art com contorno escuro, materiais com base, sombra e brilho, paletas HEX do Atlas e iluminação das brasas. Arte e som são gerados por código.
+- **Arte oficial**: o Errante e o Asgmor são animados a partir das imagens do Pedro, por recorte e articulação, em pixel art de paleta limitada. Cenário, mobs e NPCs são gerados por código.
+- **Três poções** (Cura, Defesa e Dano) que dividem os mesmos frascos, preparados na pira.
 
 Veja [`docs/DESIGN.md`](docs/DESIGN.md) para a relação entre o manual e o código.

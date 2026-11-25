@@ -39,8 +39,8 @@ const BUTTONS = [
   ['PESADO', ['heavy'], 'mid atk', 178, 24],
   ['APARAR', ['parry'], 'mid par', 104, 118],
   ['E', ['interact', 'confirm'], 'sm', 184, 98],
-  ['CURA', ['potion'], 'sm', 244, 74],
-  ['FOGO', ['spell'], 'sm', 244, 22],
+  ['POÇÃO', ['potion'], 'sm', 244, 74],
+  ['TIPO', ['nextpotion'], 'sm', 244, 22],
 ];
 const TOP = [
   ['❚❚', ['pause'], 12],
@@ -48,6 +48,7 @@ const TOP = [
   ['⇄', ['swap'], 112],
   ['ARC', ['ability'], 162],
   ['ITEM', ['item'], 212],
+  ['MAPA', ['map'], 262],
 ];
 
 function makeButton(root, label, actions, cls, style) {

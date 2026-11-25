@@ -1,5 +1,6 @@
 import { overlap, TILE } from './physics.js';
 import { sfx } from './audio.js';
+import { r2 } from './hd.js';
 
 // Partículas, números de dano, projéteis e perigos de cenário.
 export class FX {
@@ -42,7 +43,7 @@ export class FX {
     for (const p of this.parts) {
       ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
       ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(p.x - cam.x), Math.round(p.y - cam.y), p.size, p.size);
+      ctx.fillRect(r2(p.x - cam.x), r2(p.y - cam.y), p.size, p.size);
     }
     ctx.globalAlpha = 1;
     ctx.font = '8px Silkscreen, monospace';
@@ -50,9 +51,9 @@ export class FX {
     for (const n of this.nums) {
       ctx.globalAlpha = Math.min(1, n.life * 2);
       ctx.fillStyle = '#000';
-      ctx.fillText(n.text, Math.round(n.x - cam.x) + 1, Math.round(n.y - cam.y) + 1);
+      ctx.fillText(n.text, r2(n.x - cam.x) + 1, r2(n.y - cam.y) + 1);
       ctx.fillStyle = n.color;
-      ctx.fillText(n.text, Math.round(n.x - cam.x), Math.round(n.y - cam.y));
+      ctx.fillText(n.text, r2(n.x - cam.x), r2(n.y - cam.y));
     }
     ctx.globalAlpha = 1;
   }
@@ -98,7 +99,7 @@ export class Projectile {
     }
   }
   draw(ctx, cam) {
-    const x = Math.round(this.x - cam.x), y = Math.round(this.y - cam.y);
+    const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
     ctx.fillStyle = this.glow;
     ctx.globalAlpha = 0.35;
     ctx.fillRect(x - this.r - 1, y - this.r - 1, this.r * 2 + 2, this.r * 2 + 2);
@@ -126,7 +127,7 @@ export class Shockwave {
     }
   }
   draw(ctx, cam) {
-    const x = Math.round(this.x - cam.x), y = Math.round(this.y - cam.y);
+    const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
     const a = 1 - this.travelled / this.dist;
     ctx.globalAlpha = 0.5 + a * 0.5;
     ctx.fillStyle = this.color;
@@ -158,7 +159,7 @@ export class AshPatch {
     }
   }
   draw(ctx, cam) {
-    const x = Math.round(this.x - cam.x), y = Math.round(this.y - cam.y);
+    const x = r2(this.x - cam.x), y = r2(this.y - cam.y);
     const arming = this.t > this.fuse - this.warn;
     const pulse = arming ? (Math.sin(this.t * 40) > 0 ? 1 : 0.6) : 1;
     // círculo no chão

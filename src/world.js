@@ -1,11 +1,11 @@
 import { Level } from './level.js';
-import { TILE, overlap } from './physics.js';
+import { TILE, overlap, moveBody } from './physics.js';
 import { Player } from './player.js';
 import { MOB_CLASSES } from './enemies.js';
 import { Asgmor } from './boss.js';
 import { FX } from './fx.js';
 import { sfx, setMusicMode } from './audio.js';
-import { ARCANA, RELICS, PLAYER, MOBS, WEAPONS, HERBS, BOSS } from './data.js';
+import { ARCANA, RELICS, RELIC_DROP, PLAYER, MOBS, WEAPONS, HERBS, BOSS } from './data.js';
 import { saveProgress, grantWeapon, masteryLevel } from './state.js';
 import { Input } from './input.js';
 
@@ -18,7 +18,8 @@ const ELION_LINES = [
   ['Elion', 'Você acordou no meio da cinza... e ela não te queimou.'],
   ['Elion', 'Não tem rosto, nem nome. Só a runa vermelha no peito. Ela segura sua forma.'],
   ['Elion', 'Há muito tempo, Aurelian arrancou as almas luminosas do ciclo do mundo e as prendeu. Os 22 Arcanos se corromperam.'],
-  ['Elion', 'O primeiro deles, O Louco, virou Asgmor. Ele dança no Campanário Caído, ao fim deste vale.'],
+  ['Elion', 'O primeiro deles, O Louco, virou Asgmor. Ele dança no Campanário Caído, no alto da torre que você vê ao fundo.'],
+  ['Elion', 'A porta da torre ruiu. Quem ainda sobe entra por baixo: nas ruínas há um poço de serviço, coberto por tábuas.'],
   ['Elion', 'Descanse nas piras. A cinza aprende o seu caminho e o devolve quando você cair.'],
   ['Elion', 'E leia os avisos: tudo que ataca aqui anuncia antes. Amarelo pode ser aparado. Vermelho, só evitado.'],
   ['Elion', 'Sob o campanário das ruínas há uma cripta. Dizem que os sinos de lá chamam quem não deveria vir.'],
@@ -58,7 +59,10 @@ export class World {
       else this.interactables.push({ ...s, state: 0, t: 0 });
     }
     // Estado salvo aplicado ao mapa
-    if (prog.flags.wallBroken) for (let y = 0; y < this.level.g.length; y++) if (this.level.get(119, y) === 'X') this.level.set(119, y, '.');
+    const lv = prog.flags.levers || (prog.flags.levers = {});
+    if (prog.flags.wallBroken) this.level.replaceAll('X', '.');
+    if (lv.portao) this.level.replaceAll('H', '.');
+    if (lv.mec1 && lv.mec2) this.level.replaceAll('M', '.');
     if (prog.flags.shortcut) this.level.openShortcut();
     for (const m of this.mobs) if (m.type === 'sinoElite' && prog.flags.cryptSilenced) { m.dead = true; m.deathT = 99; m.unique = true; }
     if (prog.flags.bossDefeated) { this.boss.dead = true; this.boss.deathT = 99; }
@@ -106,15 +110,19 @@ export class World {
     if (p.dead) return;
     if (this.inCombat) this.tip('aviso', `Aviso amarelo: apare (${k('L', 'APARAR')}). Vermelho: esquive (${k('Shift', 'ESQUIVA')}).`, 6);
     if (p.vigor < 20) this.tip('vigor', 'Vigor baixo: pare de atacar um instante para recuperar.');
-    if (p.hp < p.maxHp * 0.5) this.tip('cura', `Beba um frasco (${k('Q', 'CURA')}). A cura leva 2,5 s e dano forte a interrompe.`);
+    if (p.hp < p.maxHp * 0.5) this.tip('cura', `Beba uma poção (${k('Q', 'POÇÃO')}). ${k('R', 'TIPO')} troca entre Cura, Defesa e Dano.`);
     if (this.finisherTarget()) this.tip('final', `Postura quebrada! Chegue perto e aperte ${k('E', 'E')} para finalizar.`);
-    const tx = p.cx() / TILE, ty = (p.y + p.h) / TILE;
-    if (tx > 126 && tx < 134 && ty < 17) this.tip('cripta', `Uma descida sob o campanário (${k('S + Espaço', '↓ + PULAR')} desce pela tábua).`);
-    if (tx > 101 && tx < 130 && ty > 26) this.tip('sinos', 'Sinos sem badalo são falsos: tocam se você passar por baixo. Quebre-os ou passe esquivando.', 6);
-    if (tx > 71 && tx < 100 && ty > 26) this.tip('vento', 'Cinza soprada em ciclos: avance na calmaria e abrigue-se atrás dos pilares.', 6);
+    const id = this.room && this.room.id, tx = p.cx() / TILE;
+    if (id === 'A01') this.tip('andar', Input.touchMode ? 'Arraste o lado esquerdo da tela para andar.' : 'A/D para andar, Espaço para pular, Shift esquiva (segure para correr).', 6);
+    if (id === 'B05' && tx > 178) this.tip('poco', `Tábuas sobre um poço: ${k('S + Espaço', '↓ + PULAR')} desce por elas.`, 6);
+    if (id === 'B05' && tx > 157 && tx < 165) this.tip('cripta', 'Um arco antigo marca a Cripta do Campanário. É opcional.', 5);
+    if (id === 'B09' && tx < 136 && tx > 128) this.tip('deslize', `Há um vão sob a pedra. ${k('Shift', 'ESQUIVA')} desliza por passagens baixas.`, 6);
+    if (id === 'C12') this.tip('mecanismo', 'A comporta responde a dois sinos. Encontre e puxe as duas alavancas.', 6);
+    if (id === 'X1' && tx < 160) this.tip('sinos', 'Sinos sem badalo são falsos: tocam se você passar por baixo. Quebre-os ou passe esquivando.', 6);
+    if (id === 'X2') this.tip('vento', 'Cinza soprada em ciclos: avance na calmaria e abrigue-se atrás dos pilares.', 6);
     if (this.flags.bossDefeated && this.prog.arcana[0] === 'louco') this.tip('arcano', `O Louco: ${k('F', 'ARC')} usa Salto de Cinzas. Veja a maestria no inventário (${k('I', 'INV')}).`, 6);
     // Marco de aproximação: o sino do campanário ecoa ao longe
-    if (!this.flags.bossDefeated && tx > 148 && tx < 167 && ty < 17) {
+    if (!this.flags.bossDefeated && (id === 'D16' || id === 'D17' || id === 'D18')) {
       this.bellT = (this.bellT || 0) - 1 / 60;
       if (this.bellT <= 0) { this.bellT = 5; sfx.bell(98, 0.05); }
     }
@@ -198,7 +206,7 @@ export class World {
   breakTiles(box, kind) {
     for (const b of this.breakables) {
       if (b.broken) continue;
-      if (overlap(box, { x: b.x - 6, y: b.y - 12, w: 12, h: 12 })) {
+      if (overlap(box, { x: b.x - 6, y: b.y - 14, w: 14, h: 14 })) {
         b.broken = true;
         sfx.breakWall();
         this.fx.burst(b.x, b.y - 6, 14, b.type === 'pot' ? '#6d4b32' : '#5a4030', 80, 0.6, 300, 2);
@@ -250,7 +258,8 @@ export class World {
       if (it.type === 'chest' && this.flags.chests[it.id]) continue;
       if (it.type === 'herb' && it.state !== 0) continue;
       if (it.type === 'falsebell' || it.type === 'vent') continue;
-      if (it.type === 'lever' && this.flags.shortcut) continue;
+      if (it.type === 'lever' && this.leverOn(it.id)) continue;
+      if (it.type === 'sign' && (it.id === 'portao' ? this.leverOn('portao') : this.leverOn('mec1') && this.leverOn('mec2'))) continue;
       if ((it.type === 'bigbell' || it.type === 'portal') && (!this.flags.bossDefeated || this.arenaLocked)) continue;
       const d = Math.abs(it.x - p.cx());
       if (d < 22 && Math.abs(it.y - (p.y + p.h)) < 20 && d < bd) { best = it; bd = d; }
@@ -275,7 +284,7 @@ export class World {
     switch (it.type) {
       case 'shrine': return this.rest(it);
       case 'elion': {
-        const lines = this.flags.bossDefeated ? ELION_AFTER : this.flags.metElion ? ELION_LINES.slice(3) : ELION_LINES;
+        const lines = this.flags.bossDefeated ? ELION_AFTER : this.flags.metElion ? ELION_LINES.slice(3, 5) : ELION_LINES;
         this.flags.metElion = true;
         return this.dialogQueue(lines);
       }
@@ -288,7 +297,17 @@ export class World {
       case 'chest': return this.openChest(it);
       case 'herb': p.startGather(it); return;
       case 'lever': return this.pullLever(it);
+      case 'sign':
+        return this.dialogQueue([it.id === 'portao'
+          ? ['Portão', 'Barras de ferro fundido. A tranca fica do outro lado: só abre por dentro.']
+          : ['Comporta', 'Duas correntes sobem até sinos presos na parede. As duas precisam se mover.']]);
       case 'stone':
+        if (it.id === 'mirante') {
+          return this.dialogQueue([
+            ['Mirante', 'Daqui se vê o Campanário Caído inteiro: a porta soterrada, a escada externa partida e, no alto, um sino que não para de balançar.'],
+            ['Mirante', 'Riscado na pedra: "Desça para subir."'],
+          ]);
+        }
         return this.dialogQueue([
           ['Inscrição', '"Aqui o Louco tocava o primeiro sino do mundo. Cada passo dele era um caminho que ainda não existia."'],
           ['Inscrição', '"Quando o sino balançar às costas dele, afaste-se: a cinza responde."'],
@@ -302,7 +321,7 @@ export class World {
 
   rest(shrine) {
     const p = this.player;
-    p.hp = p.maxHp; p.potions = p.maxPotions; p.vigor = p.maxVigor; p.foco = p.maxFoco; p.healLeft = 0;
+    p.hp = p.maxHp; p.refill(); p.vigor = p.maxVigor; p.foco = p.maxFoco; p.healLeft = 0;
     p.start('rest');
     this.checkpoint = { x: shrine.x, y: shrine.y, name: shrine.name };
     this.prog.rests = (this.prog.rests || 0) + 1;
@@ -311,14 +330,7 @@ export class World {
     sfx.rest();
     this.fx.burst(shrine.x, shrine.y - 10, 24, '#ffb070', 50, 1, -40, 2);
     this.toast(`Descansou: ${shrine.name} · progresso salvo`);
-    if (!this.flags.brasa) {
-      this.flags.brasa = true;
-      this.dialogQueue([
-        ['Pira', 'As brasas da pira se agarram aos seus dedos. Uma inscrição queima no ar:'],
-        ['Grimório', 'Feitiço aprendido: BRASA LANÇADA (Fogo). Projétil rápido de curto alcance que aplica queimadura. Custa 18 de Foco.'],
-        ['Grimório', 'Foco recupera fora de combate, a cada golpe corpo a corpo e ao aparar com perfeição.'],
-      ]);
-    }
+    this.tip('preparo', `Na pira você prepara os frascos: escolha Cura, Defesa ou Dano em ${k('I', 'INV')} > Poções.`, 6);
     this.save();
   }
 
@@ -352,8 +364,8 @@ export class World {
     const p = this.player;
     const lines = [];
     if (it.reward === 'flask') {
-      p.maxPotions = Math.min(PLAYER.maxPotionsCap, p.maxPotions + 1); p.potions = p.maxPotions;
-      lines.push(['Baú secreto', `Você encontrou um Frasco Vazio. Frascos de poção: ${p.maxPotions}.`]);
+      p.maxPotions = Math.min(PLAYER.maxPotionsCap, p.maxPotions + 1); p.refill();
+      lines.push(['Baú secreto', `Você encontrou um Frasco Vazio. Frascos de poção: ${p.maxPotions}. Escolha o preparo em Poções, no inventário.`]);
     }
     if (it.reward === 'weapon') {
       const r = grantWeapon(this.prog, it.weapon);
@@ -365,12 +377,15 @@ export class World {
     this.save();
   }
 
+  leverOn(id) { return id === 'atalho' ? !!this.flags.shortcut : !!(this.flags.levers && this.flags.levers[id]); }
   pullLever(it) {
-    this.flags.shortcut = true;
-    this.level.openShortcut();
+    const L = this.flags.levers;
+    if (it.id === 'atalho') { this.flags.shortcut = true; this.level.openShortcut(); this.toast('Atalho aberto: o alçapão de Cinzeiral', 4); } else {
+      L[it.id] = true;
+      if (it.id === 'portao') { this.level.replaceAll('H', '.'); this.toast('Atalho permanente: o portão das ruínas abriu', 4); } else if (L.mec1 && L.mec2) { this.level.replaceAll('M', '.'); this.toast('Os dois sinos respondem. A comporta abriu', 4); } else { sfx.bell(220, 0.1); this.toast('Um sino respondeu. Falta o outro', 4); }
+    }
     sfx.breakWall(); sfx.chest();
     this.shake = 4;
-    this.toast('Atalho aberto: o alçapão de Cinzeiral', 4);
     this.save();
   }
 
@@ -394,18 +409,25 @@ export class World {
     if (first) {
       pr.arcana[0] = 'louco';
       p.activeSlot = 0;
-      if (!pr.relicsOwned.includes('cinza')) pr.relicsOwned.push('cinza');
-      if (!pr.relicSlots.includes('cinza')) pr.relicSlots[pr.relicSlots.indexOf(null) >= 0 ? pr.relicSlots.indexOf(null) : 0] = 'cinza';
       pr.materials.cinzaviva = (pr.materials.cinzaviva || 0) + 1;
       // A primeira centelha: o Arcano chega com Maestria I
       pr.mastery.louco = Math.max(pr.mastery.louco || 0, 100);
       this.addCoins(BOSS.coins);
       lines.push(['Arcano Maior', `O LOUCO está equipado como Arcano Primário (Maestria I). Habilidade: ${ARCANA.louco.abilities[0].name}: ${ARCANA.louco.abilities[0].desc} Custa 20 de Foco.`]);
-      lines.push(['Relíquia', `${RELICS.cinza.name}: ${RELICS.cinza.desc}`]);
       lines.push(['Material', `Cinza Viva do Louco, e ${BOSS.coins} moedas.`]);
     } else {
       this.addCoins(BOSS.coinsRematch);
       lines.push(['Eco de Asgmor', `O eco se desfaz. ${BOSS.coinsRematch} moedas.`]);
+    }
+    // Relíquia temática: 18% por vitória, garantida na 6ª sem obtê-la (Ficha do chefe, 24/11)
+    if (!pr.relicsOwned.includes('cinza')) {
+      pr.relicTries = (pr.relicTries || 0) + 1;
+      if (Math.random() < RELIC_DROP.cinza.chance || pr.relicTries >= RELIC_DROP.cinza.pity) {
+        pr.relicsOwned.push('cinza');
+        const free = pr.relicSlots.indexOf(null);
+        if (free >= 0) pr.relicSlots[free] = 'cinza';
+        lines.push(['Relíquia', `${RELICS.cinza.name}: ${RELICS.cinza.desc}`]);
+      } else lines.push(['Relíquia', `A ${RELICS.cinza.name} não se formou (18% por vitória; garantida na 6ª, esta foi a ${pr.relicTries}ª).`]);
     }
     // Arma-signatura: 35% na 1ª vitória, 15% nas seguintes, +10 p.p. por falha até 75%
     if (pr.weapons.ruptura === undefined) {
@@ -485,14 +507,16 @@ export class World {
         it.t += dt;
         const cyc = it.t % 4;
         it.phase = cyc < 1.1 ? 'warn' : cyc < 2.4 ? 'gust' : 'calm';
-        const inRoom = p.cx() > 71 * TILE && p.cx() < 100 * TILE && p.y > 25 * TILE && p.y < 32 * TILE;
-        const near = p.y > 20 * TILE && Math.abs(p.cx() - it.x) < 520;
+        const V = this.level.crypt.vento;
+        const inRoom = p.cx() > V.x0 * TILE && p.cx() < V.x1 * TILE && p.y > (V.top - 1) * TILE && p.y < V.bot * TILE;
+        const near = p.y > (V.top - 6) * TILE && p.y < (V.bot + 4) * TILE && Math.abs(p.cx() - it.x) < 520;
         if (!near) continue;
-        if (it.phase === 'warn' && Math.random() < 0.5) this.fx.parts.push({ x: it.x + Math.random() * 10, y: 26 * TILE + Math.random() * 90, vx: 60 + Math.random() * 40, vy: 0, life: 0.6, max: 0.6, color: '#7a726c', grav: 0, size: 1 });
+        if (it.phase === 'warn' && Math.random() < 0.5) this.fx.parts.push({ x: it.x + Math.random() * 10, y: V.top * TILE + Math.random() * 90, vx: 60 + Math.random() * 40, vy: 0, life: 0.6, max: 0.6, color: '#7a726c', grav: 0, size: 1 });
         if (it.phase === 'gust') {
-          for (let i = 0; i < 3; i++) this.fx.parts.push({ x: it.x + Math.random() * 20, y: 26 * TILE + Math.random() * 96, vx: 260 + Math.random() * 120, vy: (Math.random() - 0.5) * 20, life: 1.4, max: 1.4, color: Math.random() < 0.3 ? '#b66a3b' : '#9a918a', grav: 0, size: 2 });
+          for (let i = 0; i < 3; i++) this.fx.parts.push({ x: it.x + Math.random() * 20, y: V.top * TILE + Math.random() * 96, vx: 260 + Math.random() * 120, vy: (Math.random() - 0.5) * 20, life: 1.4, max: 1.4, color: Math.random() < 0.3 ? '#b66a3b' : '#9a918a', grav: 0, size: 2 });
           if (inRoom && !this.sheltered(it.x, p)) {
-            p.x += 125 * dt;
+            const bx = { x: p.x, y: p.y, w: p.w, h: p.h, vx: 125, vy: 0, onGround: true };
+            moveBody(bx, this.level, dt); p.x = bx.x;
             if (Math.random() < 0.03) this.toast('A cinza soprada te empurra. Abrigue-se atrás dos pilares');
           }
         }
@@ -559,7 +583,7 @@ export class World {
     p.update(dt);
     // só atualiza inimigos perto da câmera (otimização)
     const cx = p.cx();
-    for (const m of this.mobs) if (m.aggro || Math.abs(m.spawnX - cx) < 520 || Math.abs(m.cx() - cx) < 520) m.update(dt);
+    for (const m of this.mobs) if ((m.aggro || Math.abs(m.spawnX - cx) < 520 || Math.abs(m.cx() - cx) < 520) && Math.abs(m.cy() - p.cy()) < 360) m.update(dt);
     for (const m of this.summons) m.update(dt);
     this.summons = this.summons.filter((m) => !(m.dead && m.deathT > 1));
     this.boss.update(dt);
@@ -572,16 +596,27 @@ export class World {
 
     const a = this.level.arena;
     const bossReady = !this.boss.dead && (!this.flags.bossDefeated || this.boss.isEcho);
-    if (bossReady && !this.arenaLocked && p.x > a.trigger && p.y < 17 * TILE && !p.dead) {
+    if (bossReady && !this.arenaLocked && p.x > a.trigger && p.y < (a.floor + 1) * TILE && !p.dead) {
       this.arenaLocked = true;
       this.level.setGate(true);
       this.boss.activate();
       this.banner = { text: this.boss.isEcho ? 'ECO DE ASGMOR' : 'ASGMOR', sub: 'O Louco corrompido', t: 0, dur: 2.6 };
     }
 
-    setMusicMode(this.arenaLocked ? 'boss' : p.y > 24 * TILE ? 'crypt' : 'explore');
-    this.inCombat = this.bossFight || this.targets().some((m) => m.aggro && Math.abs(m.cx() - p.cx()) < 300);
-    if (this.ashUp && Math.random() < 0.3 && p.y < 22 * TILE) {
+    this.inCave = this.level.isCave(Math.floor(p.cx() / TILE), Math.floor(p.cy() / TILE));
+    const rm = this.level.roomAt(p.cx(), p.y + p.h - 2);
+    if (rm && rm !== this.room) {
+      this.room = rm;
+      const seen = this.prog.rooms || (this.prog.rooms = {});
+      if (!seen[rm.id]) {
+        seen[rm.id] = true;
+        if (!this.banner && rm.sector !== 'ARENA') this.roomName = { text: rm.name, t: 0 };
+      }
+    }
+    if (this.roomName) { this.roomName.t += dt; if (this.roomName.t > 3.2) this.roomName = null; }
+    setMusicMode(this.arenaLocked ? 'boss' : this.inCave ? 'crypt' : 'explore');
+    this.inCombat = this.bossFight || this.targets().some((m) => m.aggro && Math.abs(m.cx() - p.cx()) < 300 && Math.abs(m.cy() - p.cy()) < 160);
+    if (this.ashUp && Math.random() < 0.3 && !this.inCave) {
       this.fx.parts.push({ x: this.cam.x + Math.random() * VW, y: this.cam.y + VH + 4, vx: (Math.random() - 0.5) * 10, vy: -20 - Math.random() * 20, life: 6, max: 6, color: Math.random() < 0.3 ? '#d9b58a' : '#9a918a', grav: 0, size: 1 });
     }
     if (p.dead && p.deadT > 2.6 && !this.deathPending) this.deathPending = true;
@@ -593,15 +628,12 @@ export class World {
   updateCamera(dt, snap = false) {
     const p = this.player;
     let tx = p.cx() - VW / 2 + p.facing * 24;
-    let ty = p.y - VH * 0.62;
+    let ty = p.y + p.h - VH * (this.inCave ? 0.68 : 0.74);
     const maxX = this.level.g[0].length * TILE - VW, maxY = this.level.g.length * TILE - VH;
     if (this.arenaLocked) {
       const a = this.level.arena;
       tx = Math.max(a.x0 - 8, Math.min(a.x1 - VW + 8, tx));
     }
-    // na cripta a câmera não mostra o mundo acima do teto
-    const inCrypt = this.level.isCave(Math.floor(p.cx() / TILE), Math.floor((p.y + 4) / TILE)) && p.y > 25 * TILE;
-    if (inCrypt) ty = Math.max(ty, 22 * TILE - 8);
     tx = Math.max(0, Math.min(maxX, tx)); ty = Math.max(0, Math.min(maxY, ty));
     const k = snap ? 1 : 1 - Math.pow(0.002, dt);
     this.cam.x += (tx - this.cam.x) * k;

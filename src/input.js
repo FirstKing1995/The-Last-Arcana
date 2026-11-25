@@ -10,7 +10,8 @@ const BIND = {
   parry: ['KeyL'],
   potion: ['KeyQ'],
   interact: ['KeyE'],
-  spell: ['KeyR'],
+  nextpotion: ['KeyR'],
+  map: ['KeyN'],
   ability: ['KeyF'],
   swap: ['Tab'],
   pause: ['Escape', 'KeyP'],
@@ -25,7 +26,7 @@ const BIND = {
 // Controle padrão (Xbox/PS): botão -> ação
 const PAD = {
   0: ['jump', 'confirm'], 1: ['dodge'], 2: ['light'], 3: ['heavy'],
-  4: ['parry'], 5: ['ability'], 6: ['spell'], 7: ['interact', 'confirm'],
+  4: ['parry'], 5: ['ability'], 6: ['nextpotion'], 7: ['interact', 'confirm'],
   8: ['inventory'], 9: ['pause'], 10: ['item'], 11: ['cycle'], 12: ['swap', 'up'], 13: ['potion'], 14: ['left'], 15: ['right'],
 };
 
