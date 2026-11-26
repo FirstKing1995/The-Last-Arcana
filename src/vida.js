@@ -6,6 +6,7 @@ import { CENA } from './cenameta.js';
 import { img, piece } from './art.js';
 import { hash } from './chunks.js';
 import { Q } from './config.js';
+import { rajada } from './audio.js';
 
 // Fontes de fogo do mapa: servem para luz, brasas e som. [dx, dy, raio, cor, força]
 export const FOGOS = {
@@ -38,7 +39,7 @@ export function pendulo(pr, world, time, len) {
 export function pano(ctx, nm, x, yTop, time, amp, flip) {
   const [sx, sy, w, h] = CENA[nm], k = 1 / S, st = 3;
   for (let i = 0; i < h; i += st) {
-    const f = i / h, dx = r2(Math.sin(time * 2.1 + x * 0.7 - f * 4) * amp * f * f * 2);
+    const f = i / h, dx = r2((Math.sin(time * 2.1 + x * 0.7 - f * 4) + rajada(time) * 0.8) * amp * f * f * 2);
     const hh = Math.min(st, h - i);
     ctx.drawImage(img.atlas, sx, sy + i, w, hh, r2(x - w * k / 2) + dx, r2(yTop + i * k), w * k, hh * k);
   }
@@ -57,7 +58,8 @@ export function capim(ctx, world, cam, time) {
     const n = h > 0.82 ? 6 : 3, gy = ty * TILE - cam.y;
     for (let i = 0; i < n; i++) {
       const q = hash(tx * 17 + i * 5 + ty), wx = tx * TILE + q * 15, alt = 3 + hash(tx + i * 9) * (h > 0.82 ? 7 : 4);
-      let b = vento * 0.35 + Math.sin(time * 2.4 + wx * 0.2) * 0.14;
+      const onda = Math.max(0, Math.sin((wx - time * 70) * 0.012)) ** 3 * rajada(time) * 1.6;
+      let b = vento * 0.35 + onda + Math.sin(time * 2.4 + wx * 0.2) * (0.14 + onda * 0.2);
       for (const a of at) { const d = wx - a.cx(), fy = a.y + a.h - ty * TILE; if (Math.abs(d) < 13 && fy > -14 && fy < 6) b += Math.sign(d || 1) * (1 - Math.abs(d) / 13) * 1.1; }
       ctx.fillStyle = COR[Math.floor(q * 4)];
       for (let k = 0; k < alt; k += 1.5) { const f = k / alt; ctx.fillRect(r2(wx - cam.x + b * f * f * alt * 0.8), r2(gy - k - 1), f > 0.6 ? 0.5 : 1, 1.5); }
@@ -159,5 +161,5 @@ export function vida(world, dt) {
     }
   }
   // cinza que se ergue quando o vento sopra forte
-  if (!world.inCave && Math.sin(t * 0.35) > 0.75 && Math.random() < 0.25 * rico) fx.parts.push({ x: cam.x - 6, y: cam.y + 60 + Math.random() * 120, vx: 170 + Math.random() * 90, vy: -6 + Math.random() * 12, life: 2.6, max: 2.6, color: '#c3ccd6', grav: 4, size: 0.5 });
+  if (!world.inCave && rajada(t) > 0.5 && Math.random() < 0.35 * rajada(t) * rico) fx.parts.push({ x: cam.x - 6, y: cam.y + 60 + Math.random() * 120, vx: 170 + Math.random() * 90, vy: -6 + Math.random() * 12, life: 2.6, max: 2.6, color: '#c3ccd6', grav: 4, size: 0.5 });
 }

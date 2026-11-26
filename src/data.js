@@ -88,9 +88,15 @@ export const MATERIALS = {
 };
 
 // Números do manual (tabela "Os 115 mobs") em `base`. O dono do jogo pediu luta bem mais dura em 25/11:
-// FORCA multiplica vida, postura e dano por cima do manual. Para voltar ao manual, basta pôr tudo em 1.
-export const FORCA = { hp: 1.75, posture: 1.45, dmg: 1.6, boss: 1.45 };
-const mob = (name, role, hp, posture, dmg, o) => ({ name, role, base: { hp, posture, dmg }, hp: Math.round(hp * FORCA.hp), posture: Math.round(posture * FORCA.posture), dmg: Math.round(dmg * FORCA.dmg), ...o });
+// A dificuldade é escolhida ao começar (e pode mudar em Opções). Cada uma multiplica vida, postura e dano
+// por cima do manual; "Peregrino" fica no valor do manual.
+export const DIFICULDADES = {
+  peregrino: { nome: 'Peregrino', desc: 'Inimigos com os números do manual. Para conhecer o vale.', hp: 1, posture: 1, dmg: 0.85, boss: 0.8, elite: [1.5, 1.1], juntos: 2, castiga: false },
+  errante: { nome: 'Errante', desc: 'Exige atenção aos avisos. O jeito pensado para o jogo.', hp: 1.3, posture: 1.2, dmg: 1.12, boss: 1.0, elite: [1.7, 1.2], juntos: 2, castiga: true },
+  arcano: { nome: 'Arcano', desc: 'Cada erro custa caro. Grupos matam.', hp: 1.75, posture: 1.45, dmg: 1.6, boss: 1.45, elite: [2.0, 1.3], juntos: 3, castiga: true },
+};
+export const FORCA = { hp: 1, posture: 1, dmg: 1, boss: 1, nivel: 'errante', juntos: 2, castiga: true };
+const mob = (name, role, hp, posture, dmg, o) => ({ name, role, base: { hp, posture, dmg }, hp, posture, dmg, ...o });
 export const MOBS = {
   cinzeiro: mob('Cinzeiro Trôpego', 'Bucha de canhão', 170, 60, 110, { w: 16, h: 23, speed: 92, coins: 8, drop: 'agulhas' }),
   braseiro: mob('Braseiro Oco', 'Intermediário', 430, 130, 165, { w: 20, h: 40, speed: 74, coins: 22, drop: 'machado' }),
@@ -101,5 +107,12 @@ export const MOBS = {
 };
 // Endurecido: variante marcada no mapa (maior, com aura vermelha)
 export const ELITE = { hp: 2.0, dmg: 1.3, posture: 1.6, coins: 3 };
+export function dificuldade(nivel) {
+  const d = DIFICULDADES[nivel] || DIFICULDADES.errante;
+  Object.assign(FORCA, { hp: d.hp, posture: d.posture, dmg: d.dmg, boss: d.boss, nivel: DIFICULDADES[nivel] ? nivel : 'errante', juntos: d.juntos, castiga: d.castiga });
+  ELITE.hp = d.elite[0]; ELITE.dmg = d.elite[1];
+  for (const m of Object.values(MOBS)) { m.hp = Math.round(m.base.hp * d.hp); m.posture = Math.round(m.base.posture * d.posture); m.dmg = Math.round(m.base.dmg * d.dmg); }
+}
+dificuldade('errante');
 
 export const BOSS = { name: 'Asgmor, O Louco', hp: 8500, posture: 720, coins: 600, coinsRematch: 250 };

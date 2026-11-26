@@ -192,14 +192,22 @@ function laco(fill, seg, tipo, freq) {
   const n = ac.sampleRate * seg, b = ac.createBuffer(1, n, ac.sampleRate); fill(b.getChannelData(0), n);
   const s = ac.createBufferSource(); s.buffer = b; s.loop = true; const g = ac.createGain(); g.gain.value = 0;
   const pan = ac.createStereoPanner ? ac.createStereoPanner() : null, f = ac.createBiquadFilter(); f.type = tipo; f.frequency.value = freq;
-  s.connect(f); f.connect(g); if (pan) { g.connect(pan); pan.connect(sfxBus); } else g.connect(sfxBus); s.start(0, Math.random() * seg); return { g, pan };
+  s.connect(f); f.connect(g); if (pan) { g.connect(pan); pan.connect(sfxBus); } else g.connect(sfxBus); s.start(0, Math.random() * seg); return { g, pan, f, s };
 }
 function startAmb() {
   // estalos de lenha sobre um sopro grave
   amb.fogo = laco((d, n) => { let v = 0; for (let i = 0; i < n; i++) { v = v * 0.985 + (Math.random() - 0.5) * 0.16; d[i] = v * 0.5; } for (let k = 0; k < 46; k++) { const p = Math.floor(Math.random() * (n - 900)), a = 0.25 + Math.random() * 0.75, l = 60 + Math.random() * 500; for (let i = 0; i < l; i++) d[p + i] += (Math.random() * 2 - 1) * a * Math.pow(1 - i / l, 4); } }, 3, 'highpass', 220);
   amb.agua = laco((d, n) => { let v = 0; for (let i = 0; i < n; i++) { v = v * 0.96 + (Math.random() - 0.5) * 0.3; d[i] = v * (0.6 + 0.4 * Math.sin(i / n * 6.283 * 5)); } }, 4, 'bandpass', 620);
   amb.vento = laco((d, n) => { let v = 0; for (let i = 0; i < n; i++) { v = v * 0.97 + (Math.random() - 0.5) * 0.2; d[i] = v; } }, 5, 'bandpass', 420);
+  amb.gota = laco((d) => d.fill(0), 1, 'lowpass', 16000);
+  // gravações reais (CC0, Freesound via Openverse) substituem as sintetizadas assim que chegam
+  for (const n of ['fogo', 'vento', 'agua', 'gota']) gravacao(n).then((b) => {
+    if (!b) return; const a = amb[n], s = ac.createBufferSource(); s.buffer = b; s.loop = true; s.loopStart = 0.06; s.loopEnd = b.duration - 0.06;
+    a.f.type = 'lowpass'; a.f.frequency.value = 16000; s.connect(a.f); s.start(0, Math.random() * (b.duration - 1)); try { a.s.stop(); } catch (_) {} a.s = s; a.real = true;
+  });
+  gravacao('corvos').then((b) => { amb.corvos = b; });
 }
+const gravacao = (n) => fetch(`assets/amb/${n}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => b && new Promise((ok) => ac.decodeAudioData(b, ok, () => ok(null)))).catch(() => null);
 const vai = (p, v) => p.setTargetAtTime(v, ac.currentTime, 0.25);
 let tAmb = 0, prox = { gota: 3, corvo: 6, sino: 20, forja: 0, cora: 0, ran: 12 };
 export function ambiente(w, dt) {
@@ -210,15 +218,16 @@ export function ambiente(w, dt) {
     tAmb = 0.12;
     let fv = 0, fp = 0;
     for (const q of w.level.fogos || []) { const dx = q.x - p.cx(), d = Math.hypot(dx, q.y - p.cy()), v = Math.max(0, 1 - d / 190) * (q.t === 'pira' || q.t === 'forjaria' ? 1 : q.t === 'torch' ? 0.6 : 0.22); if (v > 0) { fv += v * v; fp += v * dx / 190; } }
-    vai(amb.fogo.g.gain, Math.min(0.34, fv * 0.3)); if (amb.fogo.pan) vai(amb.fogo.pan.pan, Math.max(-0.7, Math.min(0.7, fp)));
+    vai(amb.fogo.g.gain, Math.min(amb.fogo.real ? 0.5 : 0.34, fv * (amb.fogo.real ? 0.45 : 0.3)));
+    vai(amb.gota.g.gain, w.inCave ? 0.13 : 0); if (amb.fogo.pan) vai(amb.fogo.pan.pan, Math.max(-0.7, Math.min(0.7, fp)));
     let av = 0; for (const [x0, x1, wy] of w.level.water || []) { const dx = Math.max(0, x0 * 16 - p.cx(), p.cx() - x1 * 16); av = Math.max(av, 1 - Math.hypot(dx, wy - p.cy()) / 240); }
-    vai(amb.agua.g.gain, Math.max(0, av) * 0.16);
-    vai(amb.vento.g.gain, w.inCave ? 0.02 : 0.1 + 0.07 * Math.sin(w.time * 0.35) + (p.y < 400 ? 0.08 : 0));
+    vai(amb.agua.g.gain, Math.max(0, av) * (amb.agua.real ? 0.32 : 0.16));
+    const k = amb.vento.real ? 1.6 : 1; vai(amb.vento.g.gain, k * (w.inCave ? 0.02 : 0.1 + 0.07 * Math.sin(w.time * 0.35) + (p.y < 400 ? 0.08 : 0) + rajada(w.time) * 0.08));
     vai(revG.gain, w.inCave ? 0.55 : 0.1);
   }
   for (const k in prox) prox[k] -= dt;
   if (w.inCave && prox.gota < 0) { prox.gota = 0.8 + Math.random() * 3.5; tone(900 + Math.random() * 900, 'sine', 0.09, 0.03, 420 + Math.random() * 200, 0, (Math.random() - 0.5) * 1.4); }
-  if (!w.inCave && !w.arenaLocked && prox.corvo < 0) { prox.corvo = 9 + Math.random() * 16; const pan = (Math.random() - 0.5) * 1.6; for (let i = 0; i < 2 + Math.random() * 2; i++) tone(760 + Math.random() * 120, 'sawtooth', 0.12, 0.012, 470, i * 0.22, pan); }
+  if (!w.inCave && !w.arenaLocked && prox.corvo < 0) { prox.corvo = 9 + Math.random() * 16; const pan = (Math.random() - 0.5) * 1.6; if (amb.corvos) { const s = ac.createBufferSource(); s.buffer = amb.corvos; s.playbackRate.value = 0.9 + Math.random() * 0.2; const o = out(0.16 + Math.random() * 0.1, pan); s.connect(o); const t0 = Math.random() * 6; s.start(0, t0, 2 + Math.random() * 2); } else for (let i = 0; i < 2 + Math.random() * 2; i++) tone(760 + Math.random() * 120, 'sawtooth', 0.12, 0.012, 470, i * 0.22, pan); }
   if (prox.sino < 0) { prox.sino = 24 + Math.random() * 30; sfx.bell(82 + Math.random() * 30, 0.018); }
   if (w.inCave && prox.ran < 0) { prox.ran = 10 + Math.random() * 18; if (Math.random() < 0.5) sample('chain', 0.06, 0.8); else noise(0.5, 0.03, 240, 'lowpass'); }
   // martelo da Ysara acompanha a animação
@@ -227,6 +236,8 @@ export function ambiente(w, dt) {
   const hp = p.hp / p.maxHp;
   if (!p.dead && hp < 0.3 && prox.cora < 0) { prox.cora = 0.62 + hp; tone(58, 'sine', 0.16, 0.3, 40); tone(52, 'sine', 0.18, 0.22, 36, 0.17); }
 }
+// rajada de vento: o mesmo pulso move o capim e o som
+export const rajada = (t) => Math.max(0, Math.sin(t * 0.23) * 1.4 - 0.4) * (0.6 + 0.4 * Math.sin(t * 1.7));
 export function abafar(on) { abafado = on; }
 
 function startWind() {

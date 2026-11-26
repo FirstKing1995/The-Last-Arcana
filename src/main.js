@@ -40,7 +40,8 @@ window.__game = game; // usado pelos testes automatizados
 setupHUD();
 setupUI();
 setupTelas({
-  jogar: (cont) => { if (Input.touchMode) tryFullscreenLandscape(); initAudio(); sfx.bell(196, 0.1); startGame(cont); },
+  jogar: (cont, dif) => { if (Input.touchMode) tryFullscreenLandscape(); initAudio(); sfx.bell(196, 0.1); startGame(cont, dif); },
+  mundo: () => game.world,
   continuar: () => { some(); Input.clear(); if (game.state === 'pause') { game.state = 'play'; abafar(false); } else if (game.state === 'title') abre('titulo'); },
   inventario: () => { some(); abafar(false); menu('inventory'); }, mapa: () => { some(); abafar(false); menu('map'); },
   titulo: () => { game.world.save(); game.world = null; game.state = 'title'; abafar(false); abre('titulo'); },
@@ -58,8 +59,9 @@ window.addEventListener('pointerdown', (e) => { if (e.target === canvas) canvas.
 
 function menu(kind) { game.state = 'menu'; openMenu(game.world, kind, () => { game.state = 'play'; Input.clear(); }); }
 
-function startGame(fromSave) {
+function startGame(fromSave, dif) {
   const prog = (fromSave && loadProgress()) || newProgress();
+  if (!fromSave && dif) prog.dif = dif;
   if (!fromSave) clearSave();
   game.world = new World(prog);
   game.state = 'play';

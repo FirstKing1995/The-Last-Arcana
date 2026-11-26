@@ -5,6 +5,7 @@ import { sfx } from './audio.js';
 import { Input } from './input.js';
 import { loadProgress, hasSave } from './state.js';
 import { editarBotoes } from './touch.js';
+import { DIFICULDADES } from './data.js';
 
 const T = {}; let acoes = {}, pilha = [], foco = -1;
 const CONTROLES = [['A / D', 'mover'], ['W / Espaço', 'pular (S + Espaço desce)'], ['Shift', 'rolar; com S correndo, desliza'], ['J / clique', 'atacar'], ['K / direito', 'golpe pesado; no ar, queda'], ['L / meio', 'aparar'], ['T / roda', 'trocar de arma'], ['Q', 'beber a poção'], ['R', 'trocar a poção'], ['F', 'habilidade do Arcano'], ['Tab', 'trocar Arcano'], ['E', 'interagir e finalizar'], ['C / V', 'usar / trocar item rápido'], ['I / N', 'inventário / mapa'], ['M', 'som'], ['Esc', 'pausa']];
@@ -20,6 +21,8 @@ export function setupTelas(a) {
   tela('opcoes', `<div class="painel">${cantos}<h2 class="tt">OPÇÕES</h2><div class="ops"></div><div class="linhabt"></div></div>`);
   tela('controles', `<div class="painel">${cantos}<h2 class="tt">CONTROLES</h2><div class="cs"></div><div class="linhabt"></div></div>`);
   tela('morte', '<h2>VOCÊ SE DESFEZ</h2><p></p>');
+  tela('dific', `<div class="painel">${cantos}<h2 class="tt">COMO VOCÊ QUER CAMINHAR?</h2><div class="difs"></div><div class="linhabt"></div></div>`);
+  T.dific.querySelector('.linhabt').appendChild(bot('Voltar', volta, 'peq'));
   T.morte.appendChild(bot('Levantar da cinza', () => acoes.renascer()));
   const p = T.pausa.querySelector('.painel');
   for (const [l, f, c] of [['Continuar', () => acoes.continuar()], ['Inventário', () => acoes.inventario()], ['Mapa', () => acoes.mapa()], ['Opções', () => abre('opcoes')], ['Controles', () => abre('controles')], ['Voltar ao título', () => acoes.titulo(), 'perigo']]) p.appendChild(bot(l, f, c || ''));
@@ -41,8 +44,16 @@ function titulo() {
     b.appendChild(bot('Continuar', () => acoes.jogar(true)));
     b.appendChild(el('div', 'save', `${s.checkpoint && s.checkpoint.name ? s.checkpoint.name : 'Cinzeiral'} · ${m >= 60 ? Math.floor(m / 60) + ' h ' : ''}${m % 60} min · ${s.coins || 0} moedas`));
   }
-  const n = bot('Novo jogo', () => { if (hasSave() && !confirmar) { confirmar = true; n.textContent = 'Apagar o salvo?'; n.classList.add('perigo'); return; } acoes.jogar(false); }); b.appendChild(n);
+  const n = bot('Novo jogo', () => { if (hasSave() && !confirmar) { confirmar = true; n.textContent = 'Apagar o salvo?'; n.classList.add('perigo'); return; } escolhe(); }); b.appendChild(n);
   b.appendChild(bot('Opções', () => abre('opcoes'))); b.appendChild(bot('Controles', () => abre('controles')));
+}
+function escolhe() {
+  abre('dific');
+  const d = T.dific.querySelector('.difs'); d.innerHTML = '';
+  for (const [k, v] of Object.entries(DIFICULDADES)) {
+    const b = el('button', 'dif' + (k === 'errante' ? ' on' : ''), `<b>${v.nome}</b><span>${v.desc}</span>${k === 'errante' ? '<i>recomendado</i>' : ''}`);
+    b.onclick = () => { sfx.clica(); some(); acoes.jogar(false, k); }; b.onpointerenter = () => sfx.passa(); d.appendChild(b);
+  }
 }
 function opcoes() {
   const o = T.opcoes.querySelector('.ops'); o.innerHTML = '';
@@ -51,6 +62,7 @@ function opcoes() {
   const faixa = (t, k, a, b, st) => { const i = el('input'); i.type = 'range'; i.min = a; i.max = b; i.step = st; i.value = cfg[k]; i.oninput = () => setCfg({ [k]: +i.value }); i.onchange = () => sfx.clica(); lab(t, i); };
   const chave = (t, k) => { const c = el('button', 'chave' + (cfg[k] ? ' on' : '')); c.setAttribute('role', 'switch'); c.setAttribute('aria-label', t); c.onclick = () => { setCfg({ [k]: !cfg[k] }); c.classList.toggle('on', cfg[k]); sfx.clica(); }; lab(t, c); };
   const segs = (t, k, vs) => { const s = el('div', 'segs'); for (const [v, n] of vs) { const b = el('button', cfg[k] === v ? 'on' : '', n); b.onclick = () => { setCfg({ [k]: v }); [...s.children].forEach((q) => q.classList.toggle('on', q === b)); sfx.clica(); }; s.appendChild(b); } lab(t, s); };
+  if (acoes.mundo && acoes.mundo()) { const w = acoes.mundo(); sec('JOGO'); const s = el('div', 'segs'); for (const [k, v] of Object.entries(DIFICULDADES)) { const b = el('button', (w.prog.dif || 'errante') === k ? 'on' : '', v.nome); b.onclick = () => { w.mudaDificuldade(k); [...s.children].forEach((q) => q.classList.toggle('on', q === b)); sfx.clica(); }; s.appendChild(b); } lab('Dificuldade', s); }
   sec('SOM'); faixa('Música', 'vmus', 0, 1, 0.05); faixa('Efeitos', 'vsfx', 0, 1, 0.05);
   sec('IMAGEM'); segs('Qualidade', 'qualidade', [['auto', 'Auto'], ['alta', 'Alta'], ['media', 'Média'], ['baixa', 'Baixa']]); chave('Tremor de tela', 'tremor'); chave('Números de dano', 'numeros'); chave('Minimapa', 'minimapa');
   if (Input.touchMode) { sec('CELULAR'); chave('Nomes nos botões', 'nomes'); chave('Vibração', 'vibrar'); chave('Ataque também à esquerda', 'atkEsq'); faixa('Tamanho dos botões', 'tam', 0.75, 1.3, 0.05); faixa('Opacidade', 'opac', 0.35, 1, 0.05); }
@@ -59,7 +71,7 @@ function opcoes() {
 export function telaKey(code) {
   const id = telaAberta(); if (!id) return false;
   if (code === 'Escape' || (code === 'KeyP' && id === 'pausa')) { if (id === 'titulo' || id === 'morte') return true; sfx.fecha(); volta(); return true; }
-  const bs = [...T[id].querySelectorAll('.placa')].filter((b) => b.offsetParent && b.style.visibility !== 'hidden' && b.style.display !== 'none'); if (!bs.length) return true;
+  const bs = [...T[id].querySelectorAll('.placa, .dif')].filter((b) => b.offsetParent && b.style.visibility !== 'hidden' && b.style.display !== 'none'); if (!bs.length) return true;
   const d = { ArrowDown: 1, KeyS: 1, ArrowRight: 1, ArrowUp: -1, KeyW: -1, ArrowLeft: -1 }[code];
   if (d) { foco = (Math.max(foco, d > 0 ? -1 : 0) + d + bs.length) % bs.length; bs.forEach((b, i) => b.classList.toggle('on', i === foco)); sfx.passa(); return true; }
   if (code === 'Enter' || code === 'Space' || code === 'KeyE' || code === 'KeyJ') { const b = bs[Math.max(0, foco)]; b && b.click(); return true; }

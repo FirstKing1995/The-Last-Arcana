@@ -72,7 +72,7 @@ export class Asgmor extends Mob {
 
   pick() {
     const d = this.dist, p = this.world.player;
-    if (p.action === 'heal' && p.t < 0.45) { const n = d < 130 ? 'drag' : 'leap'; this.history.push(n); return n; }
+    if (FORCA.castiga && p.action === 'heal' && p.t < 0.45) { const n = d < 130 ? 'drag' : 'leap'; this.history.push(n); return n; }
     const opts = [];
     if (d < 58) opts.push(['swipe', 5], ['swing', 3], ['leap', 2], ['drag', 2]);
     else if (d < 130) opts.push(['drag', 3], ['swing', 3], ['leap', 4], ['fan', 2]);

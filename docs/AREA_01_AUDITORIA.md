@@ -29,6 +29,7 @@ A01 Despertar → A02 Cinzeiral → A03 Pátio dos Sinos → A04 Galeria → B05
 | Errante com o design aprovado (elmo, espinhos, cabelo branco, runa) | CANON | IMPLEMENTADO a partir da imagem do Pedro; espinhos fora da colisão |
 | Asgmor conforme a ficha de 24/11 (máscara, sino com brasa, correntes) | CANON | IMPLEMENTADO a partir da imagem do Pedro |
 | 8.500 PV, kit completo, sino balança 0,7 s, rastro de 1,2 s | CANON | IMPLEMENTADO; corrigido erro em que a 2ª fase repetia o sino arrastado sem parar |
+| Dificuldade escolhida ao começar (26/11): Peregrino = manual; Errante = padrão (vida ×1,3, dano ×1,12); Arcano = a versão de 25/11 abaixo | Pedido do dono do jogo | IMPLEMENTADO |
 | Dificuldade dos mobs acima da tabela "Os 115 mobs" (vida ×1,75, postura ×1,45, dano ×1,6; Asgmor com dano ×1,45 e os mesmos 8.500 PV) | Pedido do dono do jogo (25/11) | IMPLEMENTADO; valores canônicos guardados em `base` e nos multiplicadores `FORCA` de `src/data.js` |
 | Golpes extras dos mobs, variante Endurecida, garras e sino girado do Asgmor, no máximo três ataques simultâneos | PROPOSTA | IMPLEMENTADO; aguarda a palavra do Pedro |
 | Adereços, fachadas, água rasa na Cisterna e arcos do Campanário (só aparência, colisão igual) | PROPOSTA | IMPLEMENTADO em 25/11 |

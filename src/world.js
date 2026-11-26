@@ -5,7 +5,7 @@ import { MOB_CLASSES } from './enemies.js';
 import { Asgmor } from './boss.js';
 import { FX } from './fx.js';
 import { sfx, setMusicMode } from './audio.js';
-import { ARCANA, RELICS, RELIC_DROP, PLAYER, MOBS, WEAPONS, HERBS, BOSS } from './data.js';
+import { ARCANA, RELICS, RELIC_DROP, PLAYER, MOBS, WEAPONS, HERBS, BOSS, dificuldade } from './data.js';
 import { saveProgress, grantWeapon, masteryLevel } from './state.js';
 import { Input } from './input.js';
 import { VW, VH } from './view.js';
@@ -44,6 +44,7 @@ const YSARA_HELLO = [
 export class World {
   constructor(prog) {
     this.prog = prog;
+    dificuldade(prog.dif || 'errante');
     this.level = new Level();
     this.fx = new FX();
     this.time = 0;
@@ -77,6 +78,7 @@ export class World {
   }
 
   get flags() { return this.prog.flags; }
+  mudaDificuldade(n) { this.prog.dif = n; dificuldade(n); for (const m of [...this.mobs, ...this.summons]) m.montaDef(); this.save(); }
 
   save() { this.prog.checkpoint = this.checkpoint; saveProgress(this.prog); }
 

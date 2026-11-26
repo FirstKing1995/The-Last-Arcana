@@ -7,6 +7,7 @@ const OLD = 'the-last-arcana.save.v1'; // mapa antigo: aproveita o progresso, me
 export function newProgress() {
   return {
     coins: 0,
+    dif: 'errante',
     weapons: {},                // arma -> nível de aprimoramento (+0..+5); começa de mãos vazias
     equipped: null,
     relicsOwned: [],

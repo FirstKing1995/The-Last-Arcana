@@ -1,14 +1,14 @@
 import { moveBody, overlap, GRAVITY, TILE } from './physics.js';
-import { MOBS, ELITE } from './data.js';
+import { MOBS, ELITE, FORCA } from './data.js';
 import { sfx } from './audio.js';
 import { Projectile, Shockwave, AshPatch } from './fx.js';
 
 // Base comum: vida, postura, quebra, queimadura, agressividade e território.
 export class Mob {
   constructor(world, type, x, y, opts = {}) {
-    this.world = world; this.type = type; this.def = MOBS[type];
+    this.world = world; this.type = type;
     this.hard = !!opts.elite;
-    if (this.hard) { const d = this.def; this.def = { ...d, name: d.name + ' Endurecido', hp: Math.round(d.hp * ELITE.hp), dmg: Math.round(d.dmg * ELITE.dmg), posture: Math.round(d.posture * ELITE.posture), speed: d.speed * 1.15, coins: d.coins * ELITE.coins, w: Math.round(d.w * 1.15), h: Math.round(d.h * 1.15) }; }
+    this.montaDef();
     this.w = this.def.w; this.h = this.def.h;
     this.spawnX = x; this.spawnY = y;
     this.summoned = !!opts.summoned;
@@ -23,6 +23,12 @@ export class Mob {
     this.facing = -1; this.aggro = false; this.flash = 0; this.burn = 0; this.burnTick = 0;
     this.hitT = 0; this.hitDir = 1; this.hits = 0; this.lastHit = -9; this.reflexCd = 0; this.delay = 0; this.hitDone = false; this.guarding = false; this.patrolI = 0; this.patrolWait = 0; this.alerted = false;
   }
+  // números conforme a dificuldade atual; ao trocar no meio do jogo, a vida acompanha a proporção
+  montaDef() {
+    const d = MOBS[this.type], f = this.def && this.def.hp ? this.hp / this.def.hp : 1;
+    this.def = !this.hard ? d : { ...d, name: d.name + ' Endurecido', hp: Math.round(d.hp * ELITE.hp), dmg: Math.round(d.dmg * ELITE.dmg), posture: Math.round(d.posture * ELITE.posture), speed: d.speed * 1.15, coins: d.coins * ELITE.coins, w: Math.round(d.w * 1.15), h: Math.round(d.h * 1.15) };
+    if (this.hp !== undefined && !this.dead) this.hp = Math.max(1, Math.round(this.def.hp * f));
+  }
   alive() { return !this.dead; }
   cx() { return this.x + this.w / 2; }
   cy() { return this.y + this.h / 2; }
@@ -31,7 +37,7 @@ export class Mob {
   // No máximo três inimigos armam golpe ao mesmo tempo: grupo difícil, mas dá para ler
   busy() { return /wind|strike|slash|lunge|bite|dive|erupt|slam/i.test(this.state); }
   set(s) {
-    if (/windup|Wind$|^dig$/.test(s) && !this.busy() && !this.isElite && this.world.mobs) { let n = 0; for (const m of this.world.mobs) if (m !== this && !m.dead && m.aggro && m.busy() && Math.abs(m.cx() - this.cx()) < 260) n++; if (n >= 3) return; }
+    if (/windup|Wind$|^dig$/.test(s) && !this.busy() && !this.isElite && this.world.mobs) { let n = 0; for (const m of this.world.mobs) if (m !== this && !m.dead && m.aggro && m.busy() && Math.abs(m.cx() - this.cx()) < 260) n++; if (n >= FORCA.juntos) return; }
     this.state = s; this.t = 0; this.hitDone = false; }
   isBroken() { return this.state === 'broken'; }
   endBreak() { if (this.state === 'broken') this.set('recover'); this.posture = 0; }
@@ -190,7 +196,7 @@ export class Mob {
     this.physics(dt);
   }
   // vê o Errante beber: hora de atacar
-  sawDrink() { const p = this.world.player; return p.action === 'heal' && p.t < 0.3 && this.dist < 170; }
+  sawDrink() { const p = this.world.player; return FORCA.castiga && p.action === 'heal' && p.t < 0.3 && this.dist < 170; }
 }
 
 // Bucha de canhão — avança em linha reta, ataca uma vez e recua.

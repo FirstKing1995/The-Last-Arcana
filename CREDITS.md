@@ -14,6 +14,9 @@
 - **Cenário, criaturas, NPCs, adereços, ícones e molduras da interface**: gerados no Google Gemini com pedidos próprios, seguindo o manual (`tools/montar_ia.py`).
 - **Capa**: gerada no ChatGPT a partir das imagens do Pedro.
 
+## Sons de ambiente (CC0, Freesound, achados pelo Openverse)
+- Fogo: "Fire Crackling 01", kingsrow. Vento: "ATM INT Wind Howl Cold Winter 09", Takkyi. Água: "Small brook, stream, water sound", SamsterBirdies. Goteira: "WATER DRIPPING ECHO", mlsprovideos. Corvos: "Crows In Tree", Kingcornz. Cortados e costurados em laço por `arte/trabalho/laco.py`.
+
 ## Fontes
 - **Cinzel**, **Alegreya Sans** e **Silkscreen** (Google Fonts, licença OFL).
 
